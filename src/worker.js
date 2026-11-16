@@ -105,6 +105,8 @@ const ROUTES = {
 };
 const JSON_HEADERS = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' };
 const reply = (status, data) => new Response(JSON.stringify(data), { status, headers: JSON_HEADERS });
+// The health check is shown as plain text so a phone browser displays it instead of downloading it.
+const plain = data => new Response(JSON.stringify(data), { headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
 
 async function api(request, env, url) {
   const route = ROUTES[`${request.method} ${url.pathname}`];
@@ -134,7 +136,7 @@ async function api(request, env, url) {
   }
   try {
     const out = await env.MAILROOM.get(env.MAILROOM.idFromName('main')).op(name, key, request.headers.get('CF-Connecting-IP') || '', body);
-    return reply(out.s, out.d);
+    return name === 'health' ? plain(out.d) : reply(out.s, out.d);
   } catch {
     return reply(500, { error: 'server' });
   }

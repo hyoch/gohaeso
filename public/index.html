@@ -367,7 +367,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
       <button class="ghost sm" id="peekMail">내일 아침 미리보기</button><span class="small" id="peekNote"></span>
     </div>
     <div class="penance">
-      <span class="eyebrow">오늘의 보속</span>
+      <span class="eyebrow">오늘의 작은 일 · 털어놓은 뒤, 나를 위해 하는 한 가지</span>
       <p id="penance"></p>
       <div class="row"><button class="ghost" id="did">했어요</button><span class="small" id="didMsg"></span></div>
     </div>
@@ -467,7 +467,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
       </div>
       <div class="penance">
         <span class="eyebrow">답장러의 보상</span>
-        <p id="reward">답장이 오늘의 보속으로 인정됐어요.</p>
+        <p id="reward">답장도 오늘의 작은 일로 인정됐어요. 남을 위로하는 일도 나를 돌보는 일이에요.</p>
         <span class="small" id="myCandles"></span>
         <span class="small" id="mailLine"></span>
       </div>
@@ -495,7 +495,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     <h3>처리하는 정보</h3>
     <ul>
       <li><b>실시간 마당</b>: 마당에 선 위치, 줄에 선 시각, 고민 색, 고양이 모양 번호, 당직 여부만 주고받아요. 연결할 때마다 새로 만든 무작위 번호로만 구분하고, 저장소에 기록하지 않아요. 연결이 끊기면 사라져요.</li>
-      <li><b>이 기기 안</b>(브라우저 저장소): 보속 일수, 받은 촛불 수, 소리 설정, 입장 안내를 봤는지<span data-preview>, 오늘의 답장·넘기기 횟수</span>. 글 내용은 저장하지 않아요.</li>
+      <li><b>이 기기 안</b>(브라우저 저장소): 작은 일을 한 날 수, 받은 촛불 수, 소리 설정, 입장 안내를 봤는지<span data-preview>, 오늘의 답장·넘기기 횟수</span>. 글 내용은 저장하지 않아요.</li>
       <li data-live hidden><b>우편함 열쇠</b>: 이 기기에 저장되는 무작위 문자열이에요. 서버는 열쇠를 저장하지 않고, 열쇠에서 만든 해시값만 써서 내 우편함을 구분해요. 이름·이메일·IP 주소와 이어지지 않아요.</li>
       <li data-live hidden><b>맡긴 글</b>: 당직 신부님께 보낸 고해, 신부님의 답장과 쓰는 과정 기록, 답례를 암호화해서 보관해요. 하루 사용 횟수(해시 기준)는 3일, 신고 기록은 30일, 차단 기록은 60일 뒤 지워요.</li>
       <li><b>접속 정보</b>: 통신하려면 IP 주소가 Cloudflare 네트워크를 지나가요. 이 서비스는 요청 기록을 남기지 않게 설정했고, IP 주소를 저장하거나 분석하지 않아요. 다만 Cloudflare가 자체 보안·운영 목적으로 처리할 수 있어요.</li>
@@ -1115,7 +1115,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     const bits = [`${mmss(s.active)} 동안`, `${s.fixes}번 고쳐 쓰고`, `${s.pauses}번 멈춰 생각하며 쓴 답장이에요`];
     $('proofLine').textContent = bits.join(' · ') + (nb ? ` (쓰는 동안 다른 창으로 ${nb}번 이동)` : '');
     const st = load(); if (!st.days.includes(today())) st.days.push(today()); st.days = st.days.slice(-400); save(st);
-    const n = streak(st.days), el = $('streak'); el.hidden = n === 0; el.textContent = `보속 ${n}일째`;
+    const n = streak(st.days), el = $('streak'); el.hidden = n === 0; el.textContent = `작은 일 ${n}일째`;
     $('myCandles').textContent = `받는 사람이 "따뜻했어요"를 누르면 촛불이 켜져요. 지금까지 받은 촛불 ${live ? (me ? me.feedback.warm : 0) : getC()}개.`;
     $('warmBtn').disabled = false; $('warmBtn').textContent = '따뜻했어요 🕯';
     $('compose').hidden = true; $('sent').hidden = false;
@@ -1402,7 +1402,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     while (set.has(d.toLocaleDateString('sv-SE'))) { n++; d.setDate(d.getDate() - 1) }
     return n;
   }
-  function renderStreak() { const n = streak(load().days), el = $('streak'); el.hidden = n === 0; el.textContent = `보속 ${n}일째`; }
+  function renderStreak() { const n = streak(load().days), el = $('streak'); el.hidden = n === 0; el.textContent = `작은 일 ${n}일째`; }
 
   const PANELS = ['write', 'care', 'burn', 'done'];
   function setView(id) {
