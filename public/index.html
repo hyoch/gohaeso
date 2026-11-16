@@ -439,7 +439,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
 
     <section class="panel" id="listen" hidden>
       <p class="hint">고해를 다 읽으셨군요. 답장을 쓰기 전, 상대를 위해 크게 심호흡을 세 번 해볼까요?</p>
-      <p class="small">AI는 0.1초 만에 답하지만, 여기서는 고해를 다 읽고 30초 동안 숨을 고른 뒤에 써요.</p>
+      <p class="small">AI는 0.1초 만에 답하지만, 여기서는 고해를 다 읽고 잠시 숨을 고른 뒤에 써요. 글이 길수록 조금 더 오래 고요해져요.</p>
       <div class="breath" id="breath" aria-hidden="true"></div>
       <div class="row"><span class="small" id="listenLeft" aria-live="polite"></span><button class="primary" id="listenBtn">다 읽었어요</button></div>
     </section>
@@ -829,7 +829,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
   const repliesLeft = () => live ? (me ? me.today.repliesLeft : 3) : Math.max(0, 3 - dayCount(RK));
   const passesLeft = () => live ? (me ? me.today.passesLeft : 2) : Math.max(0, 2 - dayCount(PK));
 
-  /* listen first: read, breathe 30 seconds, then write */
+  /* listen first: read, breathe 7–30 seconds (longer for longer confessions), then write */
   let listenTimer = 0;
   function resetListen() {
     clearInterval(listenTimer);
@@ -846,7 +846,8 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
       if (!r.ok) { lost('이 고해는 이미 다음 신부님께 넘어갔어요.'); return; }
       cur.state = 'reading'; cur.deadline = r.data.deadline; liveClock();
     } else stopAssign(true);
-    let s = 30; $('listenBtn').hidden = true; $('breath').classList.add('on');
+    // the pause scales with the confession: a short note gets a short breath (7s), a long story up to 30s
+    let s = Math.max(7, Math.min(30, 7 + Math.floor($('confText').textContent.length / 50))); $('listenBtn').hidden = true; $('breath').classList.add('on');
     const tick = () => {
       $('listenLeft').textContent = s > 0 ? `천천히 숨을 쉬어요 · ${s}초` : '';
       if (s-- <= 0) { clearInterval(listenTimer); $('listen').hidden = true; $('compose').hidden = false; box.focus(); }
@@ -858,7 +859,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
   let assignTimer = 0;
   function stopAssign(started) {
     clearInterval(assignTimer); assignTimer = 0;
-    if (started && G.onDuty) $('assignNote').textContent = '읽기 시작했어요. 30분 안에 답장을 보내주세요.';
+    if (started && G.onDuty) $('assignNote').textContent = '읽기 시작했어요. 10분 안에 답장을 보내주세요.';
   }
   function startAssign() {
     if (live) { liveClock(); return; }
