@@ -704,12 +704,12 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
 
   /* topics: shared with the courtyard script */
   const TOPICS = window.GOHAESO_TOPICS = [
-    { key: 'rel', name: '관계', color: '#ff8fb1' },
-    { key: 'fam', name: '가족', color: '#ffb24a' },
-    { key: 'work', name: '일·진로', color: '#6fc3ff' },
-    { key: 'self', name: '나 자신', color: '#b59cff' },
-    { key: 'ai', name: 'AI에 지친 마음', color: '#f2eee6' },
-    { key: 'etc', name: '그 외', color: '#8fe0aa' }
+    { key: 'rel', name: '관계', color: '#ff6fa8' },
+    { key: 'fam', name: '가족', color: '#ffc233' },
+    { key: 'work', name: '일·진로', color: '#4db6ff' },
+    { key: 'self', name: '나 자신', color: '#a98aff' },
+    { key: 'ai', name: 'AI에 지친 마음', color: '#ffffff' },
+    { key: 'etc', name: '그 외', color: '#5fe09a' }
   ];
   const T = Object.fromEntries(TOPICS.map(t => [t.key, t]));
   function chip(tp, pressed) {
@@ -1775,17 +1775,27 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
   }
 
   /* ---------- cats ---------- */
-  function label(text, me) {
-    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64;
-    const g = cv.getContext('2d');
-    g.font = '600 28px -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif';
-    const w = Math.min(244, g.measureText(text).width + 34), x = 128 - w / 2, y = 10, h = 44, r = 22;
-    g.fillStyle = me ? '#ffb24a' : 'rgba(20,16,28,.62)';
-    g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
-    g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.fill();
-    g.fillStyle = me ? '#2a2433' : '#f3edf8'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 128, 33);
-    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false }));
-    s.scale.set(1.3, .325, 1); return s;
+  // A name tag. With a topic it carries the candle colour (dot + ring) and the colour's meaning in words, so colours are never the only cue.
+  function label(text, me, color, topic) {
+    const cv = document.createElement('canvas'); cv.width = 256; cv.height = topic ? 100 : 64;
+    const g = cv.getContext('2d'), F = '-apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif';
+    const pill = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+    g.textBaseline = 'middle';
+    if (topic) {
+      g.font = '700 32px ' + F; const w1 = g.measureText(topic).width;
+      const w = Math.min(248, Math.max(150, w1 + 74)), x = 128 - w / 2;
+      pill(x, 6, w, 88, 30); g.fillStyle = 'rgba(20,16,28,.78)'; g.fill(); g.lineWidth = 5; g.strokeStyle = color; g.stroke();
+      g.fillStyle = color; g.beginPath(); g.arc(x + 32, 38, 13, 0, Math.PI * 2); g.fill();
+      g.textAlign = 'left'; g.fillStyle = '#ffffff'; g.fillText(topic, x + 54, 38);
+      g.font = '500 22px ' + F; g.textAlign = 'center'; g.fillStyle = 'rgba(243,237,248,.7)'; g.fillText(text, 128 + 8, 72);
+    } else {
+      g.font = '600 28px ' + F;
+      const w = Math.min(244, g.measureText(text).width + 34), x = 128 - w / 2;
+      pill(x, 10, w, 44, 22); g.fillStyle = me ? '#ffb24a' : 'rgba(20,16,28,.62)'; g.fill();
+      g.fillStyle = me ? '#2a2433' : '#f3edf8'; g.textAlign = 'center'; g.fillText(text, 128, 33);
+    }
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false }));
+    sp.scale.set(topic ? 1.45 : 1.3, topic ? .57 : .325, 1); return sp;
   }
   const glowTex = (() => {
     const cv = document.createElement('canvas'); cv.width = cv.height = 64;
@@ -1797,8 +1807,8 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     sp.scale.setScalar(s); return sp;
   }
-  function setCandle(c, color) { const k = c.userData.candle; if (!k) return; k.flame.material.color.set(color); k.glow.material.color.set(color); }
-  function makeCat({ fur, robe, name, me = false, priest = false, candle = null }) {
+  function setCandle(c, color) { const k = c.userData.candle; if (!k) return; k.flame.material.color.set(color); k.glow.material.color.set(color); k.pool.material.color.set(color); }
+  function makeCat({ fur, robe, name, me = false, priest = false, candle = null, topic = null }) {
     const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
     const furM = M(fur), dark = fur === '#3a3140';
     const robeMesh = mk(new THREE.ConeGeometry(.42, .9, 8), M(robe), 0, .45, 0); body.add(robeMesh);
@@ -1814,16 +1824,19 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     const tail = mk(new THREE.TorusGeometry(.22, .05, 6, 12, Math.PI), furM, 0, .32, -.36); tail.rotation.y = Math.PI / 2; body.add(tail);
     const collar = mk(new THREE.BoxGeometry(.13, .09, .04), B('#f4f1f6'), 0, .52, .18, false);
     collar.visible = priest; body.add(collar);
-    if (name) { const lb = label(name, me); lb.position.y = 1.78; root.add(lb); }
+    if (name) { const lb = label(name, me, candle, topic); lb.position.y = topic ? 1.92 : 1.78; root.add(lb); }
     root.userData = { body, head, tail, target: null, onArrive: null, speed: me ? 2.6 : 1.4 + rf() * .4,
       droop: !priest, hopT: 0, t: rf() * 10, entering: false, candle: null, robeMesh, collar, robeColor: robe };
     if (candle) {
-      const g = new THREE.Group(); g.position.set(.24, .6, .28);
-      g.add(mk(new THREE.CylinderGeometry(.035, .035, .2, 6), M('#f1e9dc'), 0, .1, 0));
-      const flame = mk(new THREE.ConeGeometry(.032, .1, 6), B(candle), 0, .25, 0, false);
-      const glow = glowSprite(candle, .5); glow.position.y = .25;
+      // a larger candle with a clear coloured flame, and a soft pool of the same colour on the ground, so the colour reads from afar
+      const g = new THREE.Group(); g.position.set(.26, .62, .3);
+      g.add(mk(new THREE.CylinderGeometry(.05, .05, .26, 8), M('#f1e9dc'), 0, .13, 0));
+      const flame = mk(new THREE.ConeGeometry(.055, .17, 7), B(candle), 0, .35, 0, false);
+      const glow = glowSprite(candle, 1.0); glow.position.y = .36;
       g.add(flame, glow); body.add(g);
-      root.userData.candle = { flame, glow };
+      const pool = new THREE.Mesh(new THREE.CircleGeometry(.95, 24), new THREE.MeshBasicMaterial({ color: candle, transparent: true, opacity: .34, depthWrite: false, blending: THREE.AdditiveBlending }));
+      pool.rotation.x = -Math.PI / 2; pool.position.y = .03; root.add(pool);
+      root.userData.candle = { flame, glow, pool };
     }
     return root;
   }
@@ -1849,7 +1862,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     u.head.rotation.x += (tilt - u.head.rotation.x) * Math.min(1, dt * 4);
     u.head.rotation.z = moving ? 0 : Math.sin(u.t * 1.3) * .06;
     u.tail.rotation.x = Math.sin(u.t * (u.droop ? 1.5 : 4)) * (u.droop ? .12 : .35);
-    if (u.candle) u.candle.glow.scale.setScalar(.5 * (.9 + .1 * Math.sin(u.t * 14) * Math.sin(u.t * 5.7)));
+    if (u.candle) u.candle.glow.scale.setScalar(1.0 * (.92 + .08 * Math.sin(u.t * 14) * Math.sin(u.t * 5.7)));
   }
 
   /* ---------- courtyard scene ---------- */
@@ -1964,7 +1977,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
 
   function spawnNpc(at) {
     const tp = pick(TOPICS);
-    const c = makeCat({ fur: pick(FURS), robe: pick(ROBES), name: pick(NAMES), candle: tp.color });
+    const c = makeCat({ fur: pick(FURS), robe: pick(ROBES), name: pick(NAMES), candle: tp.color, topic: tp.name });
     c.userData.topic = tp;
     const p = at || V((rf() - .5) * 18, 0, 15); c.position.copy(p); yard.add(c); npcs.add(c); return c;
   }
@@ -2265,7 +2278,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
       const s = clean(pr.presence); seen.add(pr.peer);
       let r = remotes.get(pr.peer);
       if (!r) {
-        const c = makeCat({ fur: FURS[s.fur], robe: ROBES[s.nm % ROBES.length], name: NAMES[s.nm], candle: topicOf(s.tp).color });
+        const c = makeCat({ fur: FURS[s.fur], robe: ROBES[s.nm % ROBES.length], name: NAMES[s.nm], candle: topicOf(s.tp).color, topic: topicOf(s.tp).name });
         if (s.st === 'inside') { c.position.copy(IN); c.visible = false; } else c.position.set(s.x * .3, 0, 16);
         yard.add(c); npcs.add(c);
         r = { c, st: s.st === 'inside' ? 'inside' : 'walk', s, busy: false, light: false, upd: pr.updatedAt };
