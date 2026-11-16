@@ -964,8 +964,15 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
     lastT = now; prev = box.value;
     renderTrace();
   });
-  document.addEventListener('visibilitychange', () => { if (document.hidden && t0 && !$('replyView').hidden) { blurs++; renderTrace(); } });
-  addEventListener('blur', () => { if (t0 && !$('replyView').hidden && !$('compose').hidden) { blurs++; renderTrace(); } });
+  // leaving the page counts only when it lasts 10 s or more: a glance at a notification is not counted,
+  // going to ask something else and reading its answer usually is. One trip away counts once.
+  const AWAY_MS = 10000;
+  let awayAt = 0;
+  const goAway = () => { if (t0 && !awayAt && !$('replyView').hidden && !$('compose').hidden) awayAt = Date.now(); };
+  const comeBack = () => { if (!awayAt) return; if (Date.now() - awayAt >= AWAY_MS) { blurs++; renderTrace(); } awayAt = 0; };
+  document.addEventListener('visibilitychange', () => { if (document.hidden) goAway(); else comeBack(); });
+  addEventListener('blur', goAway);
+  addEventListener('focus', comeBack);
 
   function stats() {
     let active = 0, pauses = 0, fixes = 0, delChars = 0, inDelRun = false;
@@ -1035,7 +1042,7 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
     restricted: '지금은 새 고해를 받을 수 없어요.',
     net: '지금은 연결할 수 없어요. 잠시 뒤 다시 시도해 주세요.'
   };
-  function resetComposer() { box.value = ''; prev = ''; log = []; t0 = 0; blurs = 0; renderTrace(); }
+  function resetComposer() { box.value = ''; prev = ''; log = []; t0 = 0; blurs = 0; awayAt = 0; renderTrace(); }
   function showLive(reason) {
     renderEyebrow();
     const tag = $('confTopic'); tag.textContent = '';
@@ -1177,7 +1184,7 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
     $('replyOut').textContent = sentText;
     $('thinking').textContent = '';
     const bits = [`${mmss(s.active)} 동안`, `${s.fixes}번 고쳐 쓰고`, `${s.pauses}번 멈춰 생각하며 쓴 답장이에요`];
-    $('proofLine').textContent = bits.join(' · ') + (nb ? ` (쓰는 동안 다른 창으로 ${nb}번 이동)` : '');
+    $('proofLine').textContent = bits.join(' · ') + (nb ? ` (쓰는 동안 10초 넘게 다른 화면에 ${nb}번 다녀옴)` : '');
     const st = load(); if (!st.days.includes(today())) st.days.push(today()); st.days = st.days.slice(-400); save(st);
     const n = streak(st.days), el = $('streak'); el.hidden = n === 0; el.textContent = `작은 일 ${n}일째`;
     { const n = live ? (me ? me.feedback.warm : 0) : getC();
@@ -1185,7 +1192,7 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
     $('warmBtn').disabled = false; $('warmBtn').textContent = '따뜻했어요 🕯';
     if (!reduce) { $('sendReply').disabled = true; $('compose').classList.add('fading'); await new Promise(r => setTimeout(r, 650)); $('compose').classList.remove('fading'); }
     $('compose').hidden = true; $('sent').hidden = false;
-    box.value = ''; prev = ''; log = []; t0 = 0; blurs = 0; renderTrace();
+    box.value = ''; prev = ''; log = []; t0 = 0; blurs = 0; awayAt = 0; renderTrace();
     $('sent').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
   });
 
@@ -1823,7 +1830,7 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
     letterFinal = L.text; letterLog = L.log.map(a => ({ t: a[0], at: a[1], del: a[2], ins: a[3], c: a[4] })); letterTok++;
     $('letterText').textContent = L.text; $('letterThinking').textContent = '';
     document.querySelector('#letter .badge').textContent = st.thin ? '쓰는 흔적이 적은 답장' : '사람이 손수 쓴 답장';
-    $('letterProof').textContent = `${mmss(st.active)} 동안 · ${st.fixes}번 고쳐 쓰고 · ${st.pauses}번 멈춰 생각하며 쓴 답장이에요` + (st.blurs ? ` (쓰는 동안 다른 창으로 ${st.blurs}번 이동)` : '');
+    $('letterProof').textContent = `${mmss(st.active)} 동안 · ${st.fixes}번 고쳐 쓰고 · ${st.pauses}번 멈춰 생각하며 쓴 답장이에요` + (st.blurs ? ` (쓰는 동안 10초 넘게 다른 화면에 ${st.blurs}번 다녀옴)` : '');
     $('letterWarm').disabled = L.warm; $('letterWarm').textContent = L.warm ? '촛불을 켰어요' : '따뜻했어요 🕯';
     $('thanksBox').value = ''; $('thanksBox').disabled = L.thanked; $('thanksSend').disabled = true;
     $('thanksMsg').textContent = L.thanked ? '답례를 전했어요.' : `답례도 붙여넣기 없이 손으로 써요. ${G.fmtWhen(L.deleteAt)}에 고해와 답장 모두 지워져요.`;
