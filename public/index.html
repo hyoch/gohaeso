@@ -1854,31 +1854,33 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     s.rotation.y = (rf() - .5) * .2; yard.add(s);
   }
   // chapel
+  const CHAPEL_S = 1.3, chapel = new THREE.Group();            // scaled about the front wall, so the door and queue stay where they are
+  chapel.scale.setScalar(CHAPEL_S); chapel.position.set(0, 0, -4.4 * (1 - CHAPEL_S)); yard.add(chapel);
   const stone = M('#d6cbbf'), roofM = M('#6e3b44');
-  yard.add(mk(new THREE.BoxGeometry(6.4, 4.6, 5), stone, 0, 2.3, -7));
+  chapel.add(mk(new THREE.BoxGeometry(6.4, 4.6, 5), stone, 0, 2.3, -7));
   const rs = new THREE.Shape(); rs.moveTo(-3.6, 0); rs.lineTo(3.6, 0); rs.lineTo(0, 2.6); rs.closePath();
   const rg = new THREE.ExtrudeGeometry(rs, { depth: 5.6, bevelEnabled: false }); rg.translate(0, 0, -2.8);
-  yard.add(mk(rg, roofM, 0, 4.6, -7));
-  yard.add(mk(new THREE.BoxGeometry(1.8, 8.4, 1.8), M('#cfc3b6'), 4.2, 4.2, -7.6));
-  const tr = mk(new THREE.ConeGeometry(1.55, 2.6, 4), roofM, 4.2, 9.7, -7.6); tr.rotation.y = Math.PI / 4; yard.add(tr);
-  yard.add(mk(new THREE.BoxGeometry(.12, .9, .12), M('#e9c56a'), 4.2, 11.4, -7.6));
-  yard.add(mk(new THREE.BoxGeometry(.5, .12, .12), M('#e9c56a'), 4.2, 11.55, -7.6));
-  yard.add(mk(new THREE.BoxGeometry(.7, 1, .05), B('#2a1f2c'), 4.2, 7.2, -6.68, false));
-  const rose = mk(new THREE.CircleGeometry(.8, 24), B('#d17ab0'), 0, 3.75, -4.48, false); yard.add(rose);
-  yard.add(mk(new THREE.TorusGeometry(.84, .08, 6, 24), M('#b9ad9f'), 0, 3.75, -4.47, false));
+  chapel.add(mk(rg, roofM, 0, 4.6, -7));
+  chapel.add(mk(new THREE.BoxGeometry(1.8, 8.4, 1.8), M('#cfc3b6'), 4.2, 4.2, -7.6));
+  const tr = mk(new THREE.ConeGeometry(1.55, 2.6, 4), roofM, 4.2, 9.7, -7.6); tr.rotation.y = Math.PI / 4; chapel.add(tr);
+  chapel.add(mk(new THREE.BoxGeometry(.12, .9, .12), M('#e9c56a'), 4.2, 11.4, -7.6));
+  chapel.add(mk(new THREE.BoxGeometry(.5, .12, .12), M('#e9c56a'), 4.2, 11.55, -7.6));
+  chapel.add(mk(new THREE.BoxGeometry(.7, 1, .05), B('#2a1f2c'), 4.2, 7.2, -6.68, false));
+  const rose = mk(new THREE.CircleGeometry(.8, 24), B('#d17ab0'), 0, 3.75, -4.48, false); chapel.add(rose);
+  chapel.add(mk(new THREE.TorusGeometry(.84, .08, 6, 24), M('#b9ad9f'), 0, 3.75, -4.47, false));
   // door
   const doorDark = M('#4b2b1a');
-  yard.add(mk(new THREE.BoxGeometry(2, 2.5, .25), doorDark, 0, 1.25, -4.42, false));
-  yard.add(mk(new THREE.CircleGeometry(1, 20, 0, Math.PI), doorDark, 0, 2.5, -4.29, false));
-  yard.add(mk(new THREE.PlaneGeometry(1.6, 2.3), B('#ffb24a'), 0, 1.15, -4.28, false));
+  chapel.add(mk(new THREE.BoxGeometry(2, 2.5, .25), doorDark, 0, 1.25, -4.42, false));
+  chapel.add(mk(new THREE.CircleGeometry(1, 20, 0, Math.PI), doorDark, 0, 2.5, -4.29, false));
+  chapel.add(mk(new THREE.PlaneGeometry(1.6, 2.3), B('#ffb24a'), 0, 1.15, -4.28, false));
   const doorM = M('#8a5636'), pivotL = new THREE.Group(), pivotR = new THREE.Group();
   pivotL.position.set(-.8, 0, -4.2); pivotR.position.set(.8, 0, -4.2);
   pivotL.add(mk(new THREE.BoxGeometry(.8, 2.3, .1), doorM, .4, 1.15, 0));
   pivotR.add(mk(new THREE.BoxGeometry(.8, 2.3, .1), doorM, -.4, 1.15, 0));
   pivotL.add(mk(new THREE.SphereGeometry(.05, 6, 6), M('#e9c56a'), .7, 1.15, .07, false));
   pivotR.add(mk(new THREE.SphereGeometry(.05, 6, 6), M('#e9c56a'), -.7, 1.15, .07, false));
-  yard.add(pivotL, pivotR);
-  yard.add(mk(new THREE.BoxGeometry(2.6, .2, .8), M('#b3a89b'), 0, .1, -3.95));
+  chapel.add(pivotL, pivotR);
+  chapel.add(mk(new THREE.BoxGeometry(2.6, .2, .8), M('#b3a89b'), 0, .1, -3.95));
   const doorLight = new THREE.PointLight('#ffb24a', 0, 7); doorLight.position.set(0, 1.4, -3.4); yard.add(doorLight);
   let doorTarget = 0, doorV = 0;
   // candle stand
@@ -1978,12 +1980,14 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
   const winLit = windowTex(true), winDark = windowTex(false);
   const wins = [[-2.3, 2.1], [2.3, 2.1], [-2.3, 3.45], [2.3, 3.45]].map(([x, y]) => {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(.66, 1), new THREE.MeshBasicMaterial({ map: winDark }));
-    m.position.set(x, y, -4.48); yard.add(m);
-    const gl = glowSprite('#ffb24a', 1.8); gl.position.set(x, y, -4.3); gl.visible = false; yard.add(gl);
+    m.position.set(x, y, -4.48); chapel.add(m);
+    const gl = glowSprite('#ffb24a', 1.8); gl.position.set(x, y, -4.3); gl.visible = false; chapel.add(gl);
     return { m, gl };
   });
+  const winLight = new THREE.PointLight('#ffb24a', 0, 10); winLight.position.set(0, 2.8, -2.6); yard.add(winLight);
   onDutyChange = () => {
     const n = Math.min(dutyCount(), wins.length);
+    winLight.intensity = n * .32;
     wins.forEach((w, i) => { const on = i < n; w.m.material.map = on ? winLit : winDark; w.m.material.needsUpdate = true; w.gl.visible = on; });
     const u = me.userData; u.robeMesh.material.color.set(G.onDuty ? '#15111a' : u.robeColor); u.collar.visible = G.onDuty;
   };
@@ -2177,14 +2181,14 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
   });
 
   /* ---------- sizing ---------- */
-  const stage = $('stage'), camOff = V(0, 6.2, 8.6), look = V(0, 1, 6);
+  const stage = $('stage'), camOff = V(0, 4.4, 8.4), look = V(0, 1, 6);
   function resize() {
     const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return;
     renderer.setSize(w, h, false);
     const portrait = w / h < .85;
     cam.aspect = bcam.aspect = w / h;
     cam.fov = portrait ? 58 : 50; bcam.fov = portrait ? 64 : 50;
-    camOff.set(0, 6.2, 8.6).multiplyScalar(portrait ? 1.18 : 1);
+    camOff.set(0, 4.4, 8.4).multiplyScalar(portrait ? 1.2 : 1);
     cam.updateProjectionMatrix(); bcam.updateProjectionMatrix();
   }
   new ResizeObserver(resize).observe(stage); resize();
@@ -2439,7 +2443,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
       const focus = me.visible ? me.position : DOOR;
       tmp.copy(focus).add(camOff);
       cam.position.lerp(tmp, 1 - Math.exp(-dt * 2.4));
-      tmp.copy(focus).add(V(0, 1, -2.5));
+      tmp.copy(focus).add(V(0, 2.4, -2.5));
       look.lerp(tmp, 1 - Math.exp(-dt * 3)); cam.lookAt(look);
       acc += dt;
       if (acc > .4) {
