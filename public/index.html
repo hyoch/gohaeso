@@ -154,6 +154,10 @@ button { font: inherit; cursor: pointer; border: 0; border-radius: 999px; paddin
 @keyframes blink { 50% { opacity: 0 } }
 .thinking { font-size: 12.5px; color: var(--muted); min-height: 1.4em; margin: 0 }
 .thinking.pausing { animation: blink 1.4s steps(1) infinite }
+#compose .trace { display: none }                       /* still recorded, only not shown while writing */
+#compose.fading { opacity: 0; transition: opacity .65s ease }
+#replyView > * { transition: opacity .5s ease }
+#replyView.focus > :not(.keep):not(#compose):not(:hover):not(:focus-within) { opacity: .25 }
 .more { margin: 6px 0 } .more summary { font-size: 12.5px; color: var(--muted); cursor: pointer; padding: 6px 0 }
 .shareCount { color: var(--muted); margin: -2px 0 8px }
 .gone { text-decoration: line-through; opacity: .4; transition: opacity .35s }
@@ -416,7 +420,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
       <span class="eyebrow">내가 잘 들어줄 수 있는 고민</span>
       <div class="chips" id="replyFilter" role="group" aria-label="받을 고민 영역"></div>
     </div>
-    <section class="panel">
+    <section class="panel keep">
       <div class="row"><span class="eyebrow" id="confEyebrow">우편함 · 오래 기다린 순 · 예시</span><button class="ghost sm" id="nextC">넘기기</button></div>
       <p class="small" id="assignNote" aria-live="polite"></p>
       <span class="ttag" id="confTopic"></span>
@@ -465,7 +469,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
         <span class="small" id="rcount">0자 · 20자 이상</span>
         <button class="primary" id="sendReply" disabled>손수 쓴 답장 보내기</button>
       </div>
-      <p class="small">붙여넣기, 끌어다 놓기, 자동 교정은 막혀 있어요. 쓰는 리듬이 기록되고, 받는 사람은 쓰는 과정을 다시 볼 수 있어요. 소리를 켜면 연필 소리와 망설인 침묵까지 함께 들려요.</p>
+      <p class="small">붙여넣기와 자동 교정은 막혀 있어요. 쓰는 과정은 받는 분께 그대로 보여요.</p>
     </section>
 
     <section class="panel" id="sent" hidden>
@@ -968,10 +972,12 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     $('tFix').textContent = `고쳐 쓴 횟수 ${s.fixes}`;
     $('tPause').textContent = `멈춰 생각한 횟수 ${s.pauses}`;
     $('tBlur').textContent = `다른 창 이동 ${blurs}`;
-    $('rcount').textContent = `${box.value.length}자${len < 20 ? ' · 20자 이상' : ''}`;
+    $('rcount').textContent = len < 20 ? `${box.value.length}자 · 20자부터 보낼 수 있어요` : '\u00a0';
     $('sendReply').disabled = len < 20;
   }
   setInterval(() => { if (t0 && !$('compose').hidden) renderTrace(); }, 1000);
+  /* focus mode: while a reply is being written, everything but the confession and the writing box recedes */
+  new MutationObserver(() => $('replyView').classList.toggle('focus', !$('compose').hidden)).observe($('compose'), { attributes: true, attributeFilter: ['hidden'] });
 
   /* duty */
   const G = window.GOHAESO;
@@ -1156,6 +1162,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     const n = streak(st.days), el = $('streak'); el.hidden = n === 0; el.textContent = `작은 일 ${n}일째`;
     $('myCandles').textContent = `받는 사람이 "따뜻했어요"를 누르면 촛불이 켜져요. 지금까지 받은 촛불 ${live ? (me ? me.feedback.warm : 0) : getC()}개.`;
     $('warmBtn').disabled = false; $('warmBtn').textContent = '따뜻했어요 🕯';
+    if (!reduce) { $('sendReply').disabled = true; $('compose').classList.add('fading'); await new Promise(r => setTimeout(r, 650)); $('compose').classList.remove('fading'); }
     $('compose').hidden = true; $('sent').hidden = false;
     box.value = ''; prev = ''; log = []; t0 = 0; blurs = 0; renderTrace();
     $('sent').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
