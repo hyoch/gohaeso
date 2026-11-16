@@ -12,6 +12,7 @@ const CDN = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
 if (!page.includes(CDN)) throw new Error('three.js script tag not found in site/page.html');
 page = page.replace(CDN, '/three.min.js');
 
+const CANON = 'gohaeso.space';   // keep in sync with CANONICAL_HOST in wrangler.jsonc
 const desc = 'AI 디톡스 고해소. 붙여넣기도 AI 답장도 없이, 사람만 손수 대답해요.';
 const html = `<!doctype html>
 <html lang="ko">
@@ -24,6 +25,7 @@ const html = `<!doctype html>
 <meta property="og:description" content="${desc}">
 <meta property="og:type" content="website">
 <meta name="theme-color" content="#2a2140">
+<script>if (location.hostname.endsWith('.workers.dev')) location.replace('https://${CANON}' + location.pathname + location.search + location.hash)</script>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">

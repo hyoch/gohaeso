@@ -149,6 +149,11 @@ async function api(request, env, url) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    // Old *.workers.dev address -> the real domain (keys, notifications and the installed app live per address)
+    const canon = env.CANONICAL_HOST;
+    if (canon && url.host !== canon && url.hostname.endsWith('.workers.dev')) {
+      return Response.redirect(`https://${canon}${url.pathname}${url.search}`, request.method === 'GET' || request.method === 'HEAD' ? 301 : 308);
+    }
     if (url.pathname.startsWith('/api/')) return api(request, env, url);
     const m = url.pathname.match(/^\/ws\/(lobby|yard-[1-9][0-9]?)$/);
     if (m) {
