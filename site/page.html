@@ -419,6 +419,7 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
         <li>조언은 한 가지만, 부드럽게 건네요.</li>
         <li>연락처나 실명은 묻지 않아요.</li>
         <li>위기 신호가 있는 고해는 답장러에게 오지 않고 전문 상담 안내로 먼저 연결돼요.</li>
+        <li>받은 분은 답장을 그림으로 간직하거나 나눌 수 있어요. 그림에 고해 내용과 당신이 누구인지는 담기지 않지만, 나를 알아볼 만한 이야기는 적지 말아주세요.</li>
       </ul>
     </details>
 
@@ -446,7 +447,7 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
         <span class="small" id="rcount">0자 · 20자 이상</span>
         <button class="primary" id="sendReply" disabled>손수 쓴 답장 보내기</button>
       </div>
-      <p class="small">붙여넣기와 자동 교정은 막혀 있어요. 쓰는 과정은 받는 분께 그대로 보여요.</p>
+      <p class="small">붙여넣기와 자동 교정은 막혀 있어요. 쓰는 과정이 받는 분께 보이고, 받은 분은 답장을 그림으로 간직할 수 있어요.</p>
     </section>
 
     <section class="panel" id="sent" hidden>
@@ -1081,7 +1082,7 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
   function renderInbox() {
     const f = me && me.feedback, show = !!f && (f.warm > 0 || f.thanks.length > 0);
     $('inbox').hidden = !show; if (!show) return;
-    $('inboxWarm').textContent = f.warm ? `답장에 촛불이 ${f.warm}개 켜졌어요.` : '';
+    $('inboxWarm').textContent = f.warm ? `당신의 답장이 누군가의 밤을 ${f.warm}번 밝혔어요.` : '';
     const list = $('inboxThanks'); list.textContent = ''; list.hidden = !f.thanks.length;
     f.thanks.forEach(t => { const p = document.createElement('p'); p.textContent = t.text; list.appendChild(p); });
   }
@@ -1154,7 +1155,8 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
     $('proofLine').textContent = bits.join(' · ') + (nb ? ` (쓰는 동안 다른 창으로 ${nb}번 이동)` : '');
     const st = load(); if (!st.days.includes(today())) st.days.push(today()); st.days = st.days.slice(-400); save(st);
     const n = streak(st.days), el = $('streak'); el.hidden = n === 0; el.textContent = `작은 일 ${n}일째`;
-    $('myCandles').textContent = `받는 사람이 "따뜻했어요"를 누르면 촛불이 켜져요. 지금까지 받은 촛불 ${live ? (me ? me.feedback.warm : 0) : getC()}개.`;
+    { const n = live ? (me ? me.feedback.warm : 0) : getC();
+      $('myCandles').textContent = n ? `당신의 답장이 누군가의 밤을 ${n}번 밝혔어요. 받는 분이 "따뜻했어요"를 누르면 촛불이 하나 더 켜져요.` : '받는 분이 "따뜻했어요"를 누르면 촛불이 켜져요.'; }
     $('warmBtn').disabled = false; $('warmBtn').textContent = '따뜻했어요 🕯';
     if (!reduce) { $('sendReply').disabled = true; $('compose').classList.add('fading'); await new Promise(r => setTimeout(r, 650)); $('compose').classList.remove('fading'); }
     $('compose').hidden = true; $('sent').hidden = false;
@@ -1196,7 +1198,7 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
   $('warmBtn').addEventListener('click', () => {
     const n = getC() + 1; setC(n);
     $('warmBtn').disabled = true; $('warmBtn').textContent = '촛불을 켰어요';
-    $('myCandles').textContent = `당신의 답장에 촛불이 켜졌어요. 지금까지 받은 촛불 ${n}개.`;
+    $('myCandles').textContent = `당신의 답장이 누군가의 밤을 ${n}번 밝혔어요.`;
   });
   $('anotherReply').addEventListener('click', () => {
     replayToken++; $('sent').hidden = true; if (live) claimNext(); else nextConf();
@@ -1803,23 +1805,25 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
       const probe = document.createElement('canvas').getContext('2d');
       const wrap = (str, font) => { probe.font = font; const out = []; for (const para of str.split('\n')) { let line = ''; for (const ch of para) { if (probe.measureText(line + ch).width > maxW) { out.push(line); line = ch === ' ' ? '' : ch; } else line += ch; } out.push(line); } return out; };
       const body = wrap(text, `${size}px ${SERIF}`), pr = wrap(proof, `28px ${SERIF}`);
-      const H = Math.max(1350, 250 + body.length * lh + 90 + pr.length * 44 + 190);
+      const block = 290 + body.length * lh + 50 + pr.length * 44;                 // candle + title + letter + proof
+      const H = Math.max(1920, block + 420), top = Math.round((H - block) / 2) - 40;  // 9:16 for stories, letter centred
       const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
       const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#2d2547'); bg.addColorStop(1, '#16131c'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
-      const glow = g.createRadialGradient(W / 2, 110, 4, W / 2, 110, 150); glow.addColorStop(0, 'rgba(255,200,120,.55)'); glow.addColorStop(1, 'rgba(255,200,120,0)'); g.fillStyle = glow; g.fillRect(0, 0, W, 300);
-      g.fillStyle = '#ffb24a'; g.beginPath(); g.ellipse(W / 2, 112, 15, 28, 0, 0, Math.PI * 2); g.fill();
-      g.fillStyle = '#f1e9de'; g.fillRect(W / 2 - 14, 136, 28, 60);
-      g.textAlign = 'center'; g.fillStyle = '#c9bfd8'; g.font = `30px ${SERIF}`; g.fillText('작은 고해소', W / 2, 250);
+      const glow = g.createRadialGradient(W / 2, top + 110, 4, W / 2, top + 110, 150); glow.addColorStop(0, 'rgba(255,200,120,.55)'); glow.addColorStop(1, 'rgba(255,200,120,0)'); g.fillStyle = glow; g.fillRect(0, top - 40, W, 340);
+      g.fillStyle = '#ffb24a'; g.beginPath(); g.ellipse(W / 2, top + 112, 15, 28, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#f1e9de'; g.fillRect(W / 2 - 14, top + 136, 28, 60);
+      g.textAlign = 'center'; g.fillStyle = '#c9bfd8'; g.font = `30px ${SERIF}`; g.fillText('작은 고해소', W / 2, top + 250);
       g.textAlign = 'left'; g.fillStyle = '#f4eefa'; g.font = `${size}px ${SERIF}`;
-      let y = 340; body.forEach(l => { g.fillText(l, pad, y); y += lh; });
+      let y = top + 340; body.forEach(l => { g.fillText(l, pad, y); y += lh; });
       y += 50; g.fillStyle = '#b9b1c5'; g.font = `28px ${SERIF}`; pr.forEach(l => { g.fillText(l, pad, y); y += 44; });
       g.textAlign = 'center'; g.fillStyle = '#8f86a0'; g.font = `26px ${SERIF}`;
-      g.fillText(`사람이 손수 쓴 답장 · ${new Date().toLocaleDateString('ko-KR')} · gohaeso.space`, W / 2, H - 70);
+      g.fillText(`사람이 손수 쓴 답장 · ${new Date().toLocaleDateString('ko-KR')} · gohaeso.space`, W / 2, H - 110);
       const blob = await new Promise(r => c.toBlob(r, 'image/png'));
       if (!blob) throw new Error('blob');
       const file = new File([blob], 'gohaeso-letter.png', { type: 'image/png' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try { await navigator.share({ files: [file] }); msg.textContent = '이 기기에서만 만든 그림이에요. 서버에는 남지 않아요.'; return; } catch (e) { if (e && e.name === 'AbortError') return; }
+      const share = { files: [file], text: '사람이 손수 쓴 답장 · https://gohaeso.space' };
+      if (navigator.canShare && navigator.canShare(share)) {
+        try { await navigator.share(share); msg.textContent = '이 기기에서만 만든 그림이에요. 서버에는 남지 않아요.'; return; } catch (e) { if (e && e.name === 'AbortError') return; }
       }
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'gohaeso-letter.png'; document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 4000);
