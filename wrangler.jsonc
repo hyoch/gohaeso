@@ -3,10 +3,19 @@
   "name": "gohaeso",
   "main": "src/worker.js",
   "compatibility_date": "2026-06-01",
-  // Static site lives in ./public. Only /ws/* reaches the Worker first; everything else is served as a file.
-  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/ws/*"] },
-  "durable_objects": { "bindings": [{ "name": "ROOM", "class_name": "Room" }] },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
+  // Static site lives in ./public. Only /ws/* and /api/* reach the Worker first; everything else is served as a file.
+  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/ws/*", "/api/*"] },
+  "durable_objects": { "bindings": [
+    { "name": "ROOM", "class_name": "Room" },
+    { "name": "MAILROOM", "class_name": "Mailroom" }
+  ] },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Room"] },
+    { "tag": "v2", "new_sqlite_classes": ["Mailroom"] }
+  ],
   // No request logs are collected: this service promises not to keep traces of visitors.
   "observability": { "enabled": false }
+  // Secrets (set in the Cloudflare dashboard, never in git):
+  //   MASTER_KEY  required. 32 random bytes, base64:  openssl rand -base64 32
+  //   ADMIN_TOKEN optional. 24+ random characters. Lets the operator read reported items only.
 }

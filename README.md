@@ -38,15 +38,58 @@ Cloudflare 대시보드 → Workers & Pages → Create → Import a repository �
 
 이후 `main`에 푸시할 때마다 자동으로 배포된다.
 
+## 우편함 서버 (당직 신부님께 맡기기)
+
+`MASTER_KEY`가 설정되어 있으면 켜지고, 없으면 `/api/health`가 `ok:false`를 돌려주어 화면이 미리보기로 남는다 (fail closed).
+
+| 경로 | 역할 |
+| --- | --- |
+| `src/mailroom.js` | 고해·답장·답례를 갖는 Durable Object (SQLite). 유일한 기록자라 배정이 원자적이다. |
+| `src/vault.js` | AES-256-GCM 암호화(행 id를 AAD로 묶음), 열쇠·IP를 HMAC으로만 다룸 |
+| `src/rules.js` | 한도, 위기·연락처 검사, 쓰는 과정 기록 검증 (순수 함수) |
+| `src/worker.js` | `/api/*` 라우팅, 같은 출처 검사, 본문 크기 제한 |
+| `public/mail.js` | 브라우저 쪽 클라이언트와 우편함 열쇠 |
+
+**규칙** (모두 서버가 강제한다)
+
+- 고해 → 오래 기다린 순으로 당직·우편함의 한 사람에게 배정 → 5분 안에 읽기 시작 → 읽기 시작 후 **10분 안에 답장**. 넘기면 다음 사람에게 가고, 같은 사람에게 다시 가지 않는다.
+- 미배정 고해는 48시간 뒤 지워지고 보낸 사람에게 알린다. 답장을 읽은 뒤 7일이면 고해·답장·답례가 지워지고, 안 읽은 답장은 도착 14일 뒤 지워진다.
+- 답장은 느린 우편: 6시간 이상 뒤의 첫 아침 7시(KST)에 도착한다. 돈이나 클릭으로 빨라지지 않는다.
+- 하루 60통 선착순, 한 사람 하루 1통, 답장 3통, 넘기기 2번.
+- 답장은 `[시각, 위치, 지운 수, 넣은 글, 조합여부]` 기록과 함께 와야 하고, 서버가 기록으로 글을 그대로 재현해 보고 글자당 30ms보다 빠르거나 한 번에 12자(조합 24자)를 넘게 넣은 기록은 거부한다. 쓴 시간·고친 횟수·멈춤 횟수는 서버가 계산한다.
+- 고해에는 위기 단어·전화번호·이메일·링크가 있으면 저장하지 않고 거부한다. 답장과 답례에는 연락처 유도 말도 거부한다.
+- 신고는 신고한 한 건만 운영자가 볼 수 있다 (`GET /api/admin/reports`, `ADMIN_TOKEN`). 신고한 상대는 자동 차단. 서로 다른 3명에게 답장이 신고된 사람은 새 고해를 받을 수 없다. 위기 신고(`care`)는 내용을 바로 지우고 보낸 사람에게 도움 안내를 띄운다.
+
+**비밀값 설정 (Cloudflare 대시보드 → Workers & Pages → gohaeso → Settings → Variables and Secrets, 타입 Secret)**
+
+```bash
+openssl rand -base64 32   # MASTER_KEY (필수)
+openssl rand -hex 24      # ADMIN_TOKEN (선택: 신고된 글 열람)
+```
+
+`MASTER_KEY`를 잃으면 저장된 글을 영영 풀 수 없고, 유출되면 암호화가 의미를 잃는다. 바꾸면 기존 글은 읽을 수 없게 된다.
+
+**정직한 한계**
+
+- 서버 암호화(저장 시 암호화)이지 종단간 암호화가 아니다. `MASTER_KEY`를 가진 운영자는 기술적으로 풀 수 있다. 처리방침도 그렇게 적혀 있다.
+- 쓰는 과정 검증은 사람의 입력을 흉내 내는 스크립트를 막지 못한다. 막는 것은 붙여넣기·통째 삽입·너무 빠른 입력이고, 나머지는 받는 사람의 눈(다시 보기)과 신고가 맡는다.
+- 열쇠 기반이라 하루 1통 제한은 새 열쇠로 돌아올 수 있다. 가입이 없는 대가다.
+- 한 개의 Durable Object가 모든 배정을 맡는다. 하루 60통 규모에는 충분하고, 커지면 주제별로 나눈다.
+
+**로컬 시험**
+
+`.dev.vars`(git에 올라가지 않음)에 `MASTER_KEY`, `ADMIN_TOKEN`을 넣고 `npm run dev`. `DEV_LIMITS`(JSON)로 한도를 줄여 시험할 수 있다
+(예: `{"START_MS":4000,"REPLY_MS":8000,"MAIL_DELAY_MS":0,"WAIT_MS":30000}`). **운영 환경에는 절대 설정하지 않는다.**
+
 ## 아직 미리보기인 것
 
-당직 신부님께 보내기, 우편함의 고해, 우체통 편지, 촛불 봉헌은 화면만 있고 서버에 연결되지 않았다.
-실제로 고백이 사람에게 전달되는 기능은 신고, 차단, 위기 대응, 개인정보 처리방침을 갖춘 뒤에 연다.
+촛불 봉헌(결제)과 Claude 안에서 여는 시안 페이지(서버가 없어 모든 것이 미리보기)다.
+이용 연령, 운영자 문의 창구, 법률 검토는 공개 전에 채워야 한다.
 
 three.js r128 (MIT) 를 `public/three.min.js`로 함께 배포한다.
 
-## Safety (preview stage)
+## 안전장치
 
-- **Crisis help**: a "마음이 힘들다면" button is always in the header and footer (119/112, 109, 1577-0199, 1388). Crisis words in a confession are matched on the device only and show the same numbers; nothing is sent.
-- **Report / block**: on received confessions and replies. Preview only: handled in the page, nothing leaves the device. The real server must accept one opted-in report per item and never expose the rest.
-- **Privacy policy & house rules**: in the page (`/#privacy`). Update it before any human-to-human delivery opens. The contact line still needs a real operator address.
+- **위기 안내**: 머리말과 맨 아래에 "마음이 힘들다면" 버튼 (119/112, 109, 1577-0199, 1388). 고해에 위기 단어가 있으면 기기 안에서 감지해 같은 안내를 띄우고, 신부님께 보내지 않고 혼자 털어놓기로 바꾼다. 서버도 한 번 더 막는다.
+- **신고·차단**: 받은 고해와 받은 답장에서. 서버에 연결되어 있으면 실제로 접수된다.
+- **개인정보 처리방침·이용 수칙**: 페이지 안 (`/#privacy`). 서버 동작이 바뀌면 먼저 고친다.

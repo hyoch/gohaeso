@@ -82,9 +82,68 @@ export class Room extends DurableObject {
   }
 }
 
+export { Mailroom } from './mailroom.js';
+
+// ---- mailbox API: /api/* -> the single Mailroom object ----
+const ROUTES = {
+  'GET /api/health': ['health', 0, false],
+  'GET /api/me': ['me', 0, true],
+  'POST /api/duty': ['duty', 1024, true],
+  'POST /api/confess': ['confess', 8192, true],
+  'POST /api/claim': ['claim', 1024, true],
+  'POST /api/start': ['start', 1024, true],
+  'POST /api/pass': ['pass', 1024, true],
+  'POST /api/reply': ['reply', 131072, true],
+  'GET /api/letter': ['letter', 0, true],
+  'POST /api/thanks': ['thanks', 2048, true],
+  'POST /api/warm': ['warm', 1024, true],
+  'POST /api/report': ['report', 1024, true],
+  'POST /api/block': ['block', 1024, true],
+  'POST /api/forget': ['forget', 1024, true],
+  'GET /api/admin/reports': ['admin_reports', 0, true],
+  'POST /api/admin/resolve': ['admin_resolve', 1024, true]
+};
+const JSON_HEADERS = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' };
+const reply = (status, data) => new Response(JSON.stringify(data), { status, headers: JSON_HEADERS });
+
+async function api(request, env, url) {
+  const route = ROUTES[`${request.method} ${url.pathname}`];
+  if (!route) return reply(url.pathname.startsWith('/api/') && Object.keys(ROUTES).some(k => k.endsWith(' ' + url.pathname)) ? 405 : 404, { error: 'not_found' });
+  const [name, maxBytes, auth] = route;
+  // Same-origin only. A POST must carry an Origin that matches this site.
+  const origin = request.headers.get('Origin');
+  let sameOrigin = false;
+  try { sameOrigin = !!origin && new URL(origin).host === url.host; } catch {}
+  if (origin ? !sameOrigin : request.method !== 'GET') return reply(403, { error: 'forbidden' });
+
+  let key = null;
+  if (auth) {
+    const m = /^Bearer ([A-Za-z0-9_-]{20,128})$/.exec(request.headers.get('Authorization') || '');
+    if (!m) return reply(401, { error: 'no_key' });
+    key = m[1];
+  }
+  let body = {};
+  if (request.method === 'POST') {
+    if (!/^application\/json\b/i.test(request.headers.get('Content-Type') || '')) return reply(415, { error: 'json_only' });
+    const declared = Number(request.headers.get('Content-Length') || 0);
+    if (declared > maxBytes) return reply(413, { error: 'too_big' });
+    const raw = await request.text();
+    if (raw.length > maxBytes) return reply(413, { error: 'too_big' });
+    try { body = JSON.parse(raw); } catch { return reply(400, { error: 'bad_json' }); }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return reply(400, { error: 'bad_json' });
+  }
+  try {
+    const out = await env.MAILROOM.get(env.MAILROOM.idFromName('main')).op(name, key, request.headers.get('CF-Connecting-IP') || '', body);
+    return reply(out.s, out.d);
+  } catch {
+    return reply(500, { error: 'server' });
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith('/api/')) return api(request, env, url);
     const m = url.pathname.match(/^\/ws\/(lobby|yard-[1-9][0-9]?)$/);
     if (m) {
       // Same-origin only: other sites cannot open sockets into the courtyard.

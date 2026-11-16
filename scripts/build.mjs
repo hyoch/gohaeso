@@ -34,6 +34,7 @@ img { max-width: 100% }
 </head>
 <body>
 <script src="/realtime.js"></script>
+<script src="/mail.js"></script>
 ${page}
 </body>
 </html>
