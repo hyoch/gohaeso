@@ -63,7 +63,7 @@ Cloudflare 대시보드 → Workers & Pages → Create → Import a repository �
 **비밀값 설정 (Cloudflare 대시보드 → Workers & Pages → gohaeso → Settings → Variables and Secrets, 타입 Secret)**
 
 ```bash
-openssl rand -base64 32   # MASTER_KEY (필수)
+openssl rand -hex 32      # MASTER_KEY (필수, 32자 이상이면 무엇이든 됨)
 openssl rand -hex 24      # ADMIN_TOKEN (선택: 신고된 글 열람)
 ```
 

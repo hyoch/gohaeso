@@ -1,29 +1,25 @@
 // Encryption at rest and anonymous identities.
-// MASTER_KEY (a Worker secret, 32 random bytes in base64) never touches the database.
+// MASTER_KEY (a Worker secret, 32+ random characters) never touches the database.
 //  - Text is sealed with AES-256-GCM. The row id is bound in as additional data, so a ciphertext cannot be moved to another row.
 //  - A visitor's "mailbox key" is never stored. Only an HMAC of it is, so rows carry no key and no network address.
 // Honest limit: whoever holds MASTER_KEY (the operator) can decrypt. This is encryption at rest, not end-to-end.
 
 const enc = new TextEncoder(), dec = new TextDecoder();
 
-function fromB64(s) {
-  const b = atob(String(s).trim().replace(/-/g, '+').replace(/_/g, '/'));
-  return Uint8Array.from(b, c => c.charCodeAt(0));
-}
 const hex = buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
 
 export class Vault {
   constructor(b64) { this.raw = b64; this.ready = null; }
 
-  static valid(b64) {
-    try { return typeof b64 === 'string' && fromB64(b64).length === 32; } catch { return false; }
-  }
+  // Any secret of 32+ characters works (a hex string from `openssl rand -hex 32`, or a long password-manager string).
+  // HKDF below stretches it into separate encryption and HMAC keys.
+  static valid(secret) { return typeof secret === 'string' && secret.trim().length >= 32; }
 
   async init() {
     if (!this.ready) {
       this.ready = (async () => {
-        if (!Vault.valid(this.raw)) throw new Error('MASTER_KEY missing or not 32 bytes');
-        const base = await crypto.subtle.importKey('raw', fromB64(this.raw), 'HKDF', false, ['deriveKey', 'deriveBits']);
+        if (!Vault.valid(this.raw)) throw new Error('MASTER_KEY missing or shorter than 32 characters');
+        const base = await crypto.subtle.importKey('raw', enc.encode(this.raw.trim()), 'HKDF', false, ['deriveKey', 'deriveBits']);
         const salt = new Uint8Array(32);
         this.aes = await crypto.subtle.deriveKey({ name: 'HKDF', hash: 'SHA-256', salt, info: enc.encode('gohaeso/v1/aes') },
           base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
