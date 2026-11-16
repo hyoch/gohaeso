@@ -44,3 +44,9 @@ Cloudflare 대시보드 → Workers & Pages → Create → Import a repository �
 실제로 고백이 사람에게 전달되는 기능은 신고, 차단, 위기 대응, 개인정보 처리방침을 갖춘 뒤에 연다.
 
 three.js r128 (MIT) 를 `public/three.min.js`로 함께 배포한다.
+
+## Safety (preview stage)
+
+- **Crisis help**: a "마음이 힘들다면" button is always in the header and footer (119/112, 109, 1577-0199, 1388). Crisis words in a confession are matched on the device only and show the same numbers; nothing is sent.
+- **Report / block**: on received confessions and replies. Preview only: handled in the page, nothing leaves the device. The real server must accept one opted-in report per item and never expose the rest.
+- **Privacy policy & house rules**: in the page (`/#privacy`). Update it before any human-to-human delivery opens. The contact line still needs a real operator address.
