@@ -48,12 +48,12 @@ img { max-width: 100% }
   --sans: -apple-system, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #16131c; --paper: #221d2a; --ink: #ece6f3; --muted: #a39aae; --velvet: #8a4472; --flame: #ffb24a;
+  --bg: #16131c; --paper: #221d2a; --ink: #ece6f3; --muted: #b9b1c5; --velvet: #8a4472; --flame: #ffb24a;
   --glow: rgba(255, 178, 74, .16); --care: #9fd3d6; --care-bg: #1d2f31; --line: rgba(236, 230, 243, .14);
   --warm: #2f2616; --warm-line: #6b5426;
   --alert: #f09ac4; color-scheme: dark } }
 :root[data-theme="dark"] {
-  --bg: #16131c; --paper: #221d2a; --ink: #ece6f3; --muted: #a39aae; --velvet: #8a4472; --flame: #ffb24a;
+  --bg: #16131c; --paper: #221d2a; --ink: #ece6f3; --muted: #b9b1c5; --velvet: #8a4472; --flame: #ffb24a;
   --glow: rgba(255, 178, 74, .16); --care: #9fd3d6; --care-bg: #1d2f31; --line: rgba(236, 230, 243, .14);
   --warm: #2f2616; --warm-line: #6b5426;
   --alert: #f09ac4; color-scheme: dark }
@@ -158,6 +158,7 @@ button { font: inherit; cursor: pointer; border: 0; border-radius: 999px; paddin
 #compose.fading { opacity: 0; transition: opacity .65s ease }
 #replyView > * { transition: opacity .5s ease }
 #replyView.focus > :not(.keep):not(#compose):not(:hover):not(:focus-within) { opacity: .25 }
+body.typing { padding-bottom: 45vh }                   /* room to scroll the box above the keyboard */
 .more { margin: 6px 0 } .more summary { font-size: 12.5px; color: var(--muted); cursor: pointer; padding: 6px 0 }
 .shareCount { color: var(--muted); margin: -2px 0 8px }
 .gone { text-decoration: line-through; opacity: .4; transition: opacity .35s }
@@ -905,6 +906,18 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
 
   /* composer with human-writing trace */
   const box = $('replyBox'), warnEl = $('warn');
+  /* keep the line being written clear of the phone keyboard and its toolbar */
+  const vv = window.visualViewport;
+  const clearKeyboard = () => {
+    if (document.activeElement !== box) return;
+    const h = vv ? vv.height : innerHeight, r = box.getBoundingClientRect(), room = 72;      // room: iOS accessory bar
+    const top = vv ? vv.offsetTop : 0, over = r.bottom - (top + h - room);
+    if (over > 0) scrollBy({ top: over, behavior: reduce ? 'auto' : 'smooth' });
+  };
+  box.addEventListener('focus', () => { document.body.classList.add('typing'); setTimeout(clearKeyboard, 350); setTimeout(clearKeyboard, 800); });
+  box.addEventListener('blur', () => document.body.classList.remove('typing'));
+  box.addEventListener('input', clearKeyboard);
+  if (vv) vv.addEventListener('resize', clearKeyboard);
   const BLOCK = new Set(['insertFromPaste', 'insertFromPasteAsQuotation', 'insertFromDrop', 'insertFromYank', 'insertReplacementText', 'insertLink']);
   const MAX_BURST = 12;
   let prev = '', log = [], t0 = 0, lastT = 0, composing = false, blurs = 0, warnTimer = 0;
