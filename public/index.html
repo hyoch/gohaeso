@@ -252,7 +252,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
         <li>정신건강위기상담전화 <span class="num"><a href="tel:1577-0199">1577-0199</a></span> (24시간)</li>
         <li>청소년 상담 <span class="num"><a href="tel:1388">1388</a></span></li>
       </ul>
-      <div class="small">이곳의 신부님은 전문 상담사가 아니라 평범한 사람이에요. 위기 상황의 도움을 대신할 수 없어요. 가까운 사람에게도 먼저 알려주세요. 이 안내는 이 화면 안에서만 떠요. 아무 데도 기록되거나 전송되지 않아요.</div>
+      <div class="small">이곳의 신부님은 전문 상담사가 아니라 당신과 같은 평범한 사람이에요. 위기 상황을 직접 해결해 드릴 순 없지만, 당신이 무사히 내일을 맞이하기를 진심으로 바라요. 가까운 사람에게도 먼저 알려주세요. 이 안내는 이 화면 안에서만 떠요. 아무 데도 기록되거나 전송되지 않아요.</div>
     </section>
   </div>
 
@@ -306,7 +306,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
       <p class="replyText" id="letterText"></p>
       <p class="small" id="letterProof"></p>
       <p class="thinking" id="letterThinking"></p>
-      <div class="row"><button class="ghost sm" id="letterReplay" hidden>쓰는 과정 다시 보기</button><button class="ghost sm" id="letterWarm">따뜻했어요 🕯</button><button type="button" class="ghost sm" id="reportLetter">신고 · 차단</button></div>
+      <div class="row"><button class="ghost sm" id="letterReplay" hidden>쓰는 과정 다시 보기</button><button class="ghost sm" id="letterWarm">따뜻했어요 🕯</button><button type="button" class="ghost sm" id="reportLetter">어긋난 마음 알리기</button></div>
     </div>
     <label class="hint" for="thanksBox">신부님께 짧은 답례</label>
     <textarea id="thanksBox" class="short" maxlength="200" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
@@ -358,6 +358,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
 
   <section class="panel" id="done" hidden>
     <p class="reply" id="reply"></p>
+    <p class="small keytip" id="keyTip" hidden>🗝 이 기기에 우편함 열쇠가 만들어졌어요. 열쇠를 잃어버리면 저희도 우편함을 찾아드릴 방법이 없어요. 답장이 올 때까지 이 열쇠를 당신만의 비밀 수첩에 꼭 적어두세요. <a href="#privacy">열쇠 보러 가기</a></p>
     <div class="oneLine" id="oneLineBox" hidden>
       <span class="eyebrow">먼저 다녀간 사람의 한 줄 · 예시</span>
       <p id="oneLine"></p>
@@ -407,7 +408,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
       <span class="ttag" id="confTopic"></span>
       <p class="confText" id="confText"></p>
       <span class="small" id="confMeta"></span>
-      <div class="row" id="safeConf"><button type="button" class="ghost sm" id="reportConf">신고 · 차단</button><span class="small">연락처를 묻거나 해치는 내용이면 알려주세요.</span></div>
+      <div class="row" id="safeConf"><button type="button" class="ghost sm" id="reportConf">어긋난 마음 알리기</button><span class="small">연락처를 묻거나 해치는 내용이면 알려주세요.</span></div>
     </section>
 
     <section class="panel" id="inbox" hidden>
@@ -534,7 +535,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     <p>가입이 없어 나이를 확인하지 않고, 어떤 연령의 개인정보도 수집하지 않아요. 이용 연령은 정해지는 대로 알려요.</p>
     <h3 data-live hidden>우편함 열쇠</h3>
     <div data-live hidden class="legal" style="display:grid;gap:8px">
-      <p>로그인 대신 이 기기에 저장된 열쇠로 내 우편함을 열어요. 열쇠를 잃어버리면 누구도 되찾아줄 수 없어요. 다른 기기에서 쓰려면 열쇠를 적어두었다가 '열쇠 넣기'로 넣어요. 열쇠를 아는 사람은 내 우편함을 열 수 있으니 남에게 보여주지 마세요.</p>
+      <p>로그인 대신 이 기기에 저장된 열쇠로 내 우편함을 열어요. 열쇠를 잃어버리면 저희도 우편함을 찾아드릴 방법이 없어요. 이 열쇠를 당신만의 비밀 수첩에 꼭 적어두세요. 다른 기기에서 쓰려면 그 열쇠를 '열쇠 넣기'로 넣어요. 열쇠를 아는 사람은 내 우편함을 열 수 있으니 남에게 보여주지 마세요.</p>
       <input id="keyField" type="text" readonly hidden aria-label="우편함 열쇠" autocomplete="off" spellcheck="false">
       <div class="row"><button type="button" class="ghost sm" id="keyShow">열쇠 보기</button><button type="button" class="ghost sm" id="keyUse">열쇠 넣기</button><button type="button" class="ghost sm" id="keyErase">맡긴 글 지우고 열쇠 버리기</button></div>
       <p class="small" id="keyMsg" aria-live="polite"></p>
@@ -1205,7 +1206,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
   const G = () => window.GOHAESO || {};
   const KINDS = {
     conf: {
-      title: '이 고해 신고 · 차단',
+      title: '이 고해, 어긋난 마음 알리기 · 차단',
       lead: '이 고해가 답장하기에 안전하지 않다면 알려주세요. 신고한 고해는 바로 닫혀요.',
       reasons: [
         { id: 'care', t: '도움이 필요해 보여요', care: true },
@@ -1218,7 +1219,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
       after: () => { const g = G(); if (g.dropConf) g.dropConf(); const n = $('nextC'); if (n && !n.disabled) n.focus(); }
     },
     letter: {
-      title: '이 답장 신고 · 차단',
+      title: '이 답장, 어긋난 마음 알리기 · 차단',
       lead: '받은 답장이 이곳의 서약에 어긋난다면 알려주세요. 신고하면 이 편지는 접혀요.',
       reasons: [
         { id: 'ai', t: 'AI가 쓴 것 같아요' },
@@ -1512,6 +1513,9 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     }
     if (mailLive && duty) $('proofDuty').textContent = '이 글만 암호화되어 서버에 맡겨졌고, 한 분께만 배정돼요. 48시간 안에 아무도 답하지 못하면 지워지고, 답장을 읽은 뒤 7일이면 고해와 답장이 모두 지워져요. 돈을 내도 빨라지지 않고, AI 학습에도 광고에도 쓰이지 않아요.';
     $('proofAlone').hidden = duty; $('proofDuty').hidden = !duty;
+    let told = false; try { told = localStorage.getItem('gohaeso.keyTold') === '1'; } catch {}
+    $('keyTip').hidden = !(mailLive && duty) || told;
+    if (mailLive && duty) { try { localStorage.setItem('gohaeso.keyTold', '1'); } catch {} }
     $('penance').textContent = pick(PENANCE);
     $('didMsg').textContent = ''; $('did').disabled = false;
     $('reqs').textContent = performance.getEntriesByType('resource').length - reqBefore;
