@@ -12,6 +12,8 @@
   --glow: rgba(233, 150, 47, .18);
   --care: #2f5d62;
   --care-bg: #e2eeee;
+  --warm: #fbf0d8;
+  --warm-line: #e3c88c;
   --line: rgba(42, 36, 51, .14);
   --alert: #9a2f5e;
   --scene: #2a2140;
@@ -23,10 +25,12 @@
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #16131c; --paper: #221d2a; --ink: #ece6f3; --muted: #a39aae; --velvet: #8a4472; --flame: #ffb24a;
   --glow: rgba(255, 178, 74, .16); --care: #9fd3d6; --care-bg: #1d2f31; --line: rgba(236, 230, 243, .14);
+  --warm: #2f2616; --warm-line: #6b5426;
   --alert: #f09ac4; color-scheme: dark } }
 :root[data-theme="dark"] {
   --bg: #16131c; --paper: #221d2a; --ink: #ece6f3; --muted: #a39aae; --velvet: #8a4472; --flame: #ffb24a;
   --glow: rgba(255, 178, 74, .16); --care: #9fd3d6; --care-bg: #1d2f31; --line: rgba(236, 230, 243, .14);
+  --warm: #2f2616; --warm-line: #6b5426;
   --alert: #f09ac4; color-scheme: dark }
 
 * { box-sizing: border-box }
@@ -83,9 +87,9 @@ button { font: inherit; cursor: pointer; border: 0; border-radius: 999px; paddin
 .proof { display: flex; gap: 10px; align-items: flex-start; background: var(--glow); border-radius: 10px; padding: 10px 12px; font-size: 13px }
 .proof b { font-variant-numeric: tabular-nums }
 
-.care { background: var(--care-bg); color: var(--ink); border-radius: 14px; padding: 16px 18px; display: grid; gap: 10px }
-.care strong { color: var(--care) }
-.care .num { font-variant-numeric: tabular-nums; user-select: all; font-weight: 700; color: var(--care) }
+.care { background: var(--warm); color: var(--ink); border: 1px solid var(--warm-line); border-radius: 14px; padding: 16px 18px; display: grid; gap: 10px }
+.care strong { color: var(--ink); font-family: var(--serif); font-weight: 700; line-height: 1.5 }
+.care .num { font-variant-numeric: tabular-nums; user-select: all; font-weight: 700; color: var(--ink) }
 
 .vow { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: grid; gap: 12px; margin-top: 8px }
 .vow .kicker { font-size: 11.5px; letter-spacing: .14em; color: var(--alert); font-weight: 700 }
@@ -140,11 +144,11 @@ select:focus-visible { outline: 2px solid var(--flame); outline-offset: 2px }
 @keyframes breathe { 0%, 100% { transform: scale(.6) } 50% { transform: scale(1) } }
 @media (prefers-reduced-motion: reduce) { .breath.on { animation: none; transform: scale(.85) } }
 
-.careBtn { border-color: var(--care); color: var(--care) }
-.care a { color: var(--care); text-decoration: none }
+.careBtn { border-color: var(--warm-line); color: var(--ink); background: var(--warm) }
+.care a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--warm-line); text-underline-offset: 3px }
 .care ul.nums { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px }
-.care-hint { margin: 0; background: var(--care-bg); border-radius: 10px; padding: 10px 12px; font-size: 13.5px }
-.care-hint .num { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--care) }
+.care-hint { margin: 0; background: var(--warm); border: 1px solid var(--warm-line); border-radius: 10px; padding: 10px 12px; font-size: 13.5px }
+.care-hint .num { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink) }
 .chk { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px }
 .chk input { margin-top: 4px; accent-color: var(--velvet) }
 .linkbtn { background: none; border: 0; padding: 0; margin: 0; font: inherit; font-weight: 500; color: inherit; text-decoration: underline; border-radius: 4px; cursor: pointer }
@@ -157,24 +161,60 @@ select:focus-visible { outline: 2px solid var(--flame); outline-offset: 2px }
 .legal input { width: 100%; font: inherit; font-size: 13px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink) }
 .mailChipBtn { cursor: pointer }
 footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
+.hero { display: grid; justify-items: center; text-align: center; align-content: center; gap: 12px; min-height: min(66vh, 540px); padding-block: 20px; position: relative }
+.hero .heroTop { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px }
+.hero .kicker { font-size: 11.5px; letter-spacing: .14em; color: var(--alert); font-weight: 700 }
+.hero h1 { font-size: 15px; color: var(--muted); letter-spacing: .08em }
+.hero h2 { font-family: var(--serif); font-size: clamp(28px, 8vw, 40px); line-height: 1.3; margin: 0; text-wrap: balance }
+.hero .tag { max-width: 24em; text-wrap: balance }
+.hero .enter { margin-top: 10px; padding: 13px 26px; font-size: 15px; box-shadow: 0 10px 28px -14px var(--velvet) }
+.vow { margin-top: 0 }
+.vow ol { gap: 18px }
+.vow li { font-size: 15.5px }
+.demo { background: var(--bg); border-radius: 12px; padding: 14px 16px; display: grid; gap: 6px }
+.demo .replyText { min-height: 3.6em }
+.appbar { display: grid; gap: 12px; scroll-margin-top: 16px }
+.about { text-align: center; display: grid; gap: 8px; padding: 24px 8px 4px }
+.about .confess { margin: 0; font-family: var(--serif); font-size: 15.5px; line-height: 1.8; text-wrap: balance }
+.reveal .reveal-i { opacity: 0; transform: translateY(10px); transition: opacity .9s ease, transform .9s ease }
+.reveal .reveal-i.in { opacity: 1; transform: none }
+.gate { position: absolute; inset: 0; z-index: 5; display: grid; align-content: center; justify-items: center; gap: 12px; padding: 24px; text-align: center;
+  background: rgba(11, 8, 16, .94); color: var(--hud-fg); transition: opacity .9s ease }
+.gate.out { opacity: 0; pointer-events: none }
+.gateT { margin: 0; font-family: var(--serif); font-size: 22px }
+.gateS { margin: 0; font-size: 13.5px; opacity: .75 }
+.gate .chips { justify-content: center }
+.gate .chip-t { background: rgba(255, 255, 255, .08); color: var(--hud-fg); border-color: rgba(255, 255, 255, .26); padding: 9px 16px; font-size: 14.5px }
+.gate .chip-t[aria-pressed="false"] { opacity: 1 }
+.gateSkip { color: var(--hud-fg); opacity: .6; font-size: 12.5px }
+@media (prefers-reduced-motion: reduce) { .reveal .reveal-i { transition: none } .gate { transition: none } }
 @media (prefers-reduced-motion: reduce) { .smoke span { animation: none; opacity: 0 } .fade { transition: none } }
 </style>
 
 <div class="wrap">
-  <header>
+  <header class="hero">
+    <div class="heroTop"><span class="kicker">AI 디톡스 고해소</span><button type="button" class="linkbtn" id="heroHelp">마음이 힘들다면</button></div>
     <h1>작은 고해소</h1>
-    <section class="vow" aria-labelledby="vowTitle">
-      <span class="kicker">AI 디톡스 고해소</span>
-      <h2 id="vowTitle">여기서는 사람만 대답해요.</h2>
-      <p class="small">AI가 쓴 축하, AI가 쓴 사과, AI가 쓴 위로에 지쳤다면 잘 왔어요.</p>
-      <ol>
-        <li><span class="seal">서약 1</span><span><b>붙여넣기 없음.</b> 모든 답장은 한 글자씩 손으로 쳐요.</span></li>
-        <li><span class="seal">서약 2</span><span><b>AI 답장 없음.</b> 추천 문장도, 자동 요약도, AI 신부님도 없어요.</span></li>
-        <li><span class="seal">서약 3</span><span><b>쓰는 과정 공개.</b> 망설인 시간과 고쳐 쓴 흔적까지 받는 사람에게 보여줘요.</span></li>
-        <li><span class="seal">서약 4</span><span><b>고백은 팔지 않음.</b> AI 학습에도, 광고에도 쓰이지 않아요. 돈을 내도 위로가 빨라지지 않아요.</span></li>
-      </ol>
-      <p class="confess">먼저 고백할게요. 이 고해소는 AI의 도움으로 지었어요. 그래서 위로만큼은 사람 손에 맡기기로 했어요.</p>
-    </section>
+    <h2 id="vowTitle">여기서는 사람만 대답해요.</h2>
+    <p class="tag">AI가 쓴 축하, AI가 쓴 사과, AI가 쓴 위로에 지쳤다면 잘 왔어요.</p>
+    <button type="button" class="primary enter" id="enter">촛불 켜고 입장하기</button>
+  </header>
+
+  <section class="vow" aria-label="네 가지 서약">
+    <ol>
+      <li class="reveal-i"><span class="seal">서약 1</span><span><b>붙여넣기 없음.</b> 모든 답장은 한 글자씩 손으로 쳐요.</span></li>
+      <li class="reveal-i"><span class="seal">서약 2</span><span><b>AI 답장 없음.</b> 추천 문장도, 자동 요약도, AI 신부님도 없어요.</span></li>
+      <li class="reveal-i"><span class="seal">서약 3</span><span><b>쓰는 과정 공개.</b> 망설인 시간과 고쳐 쓴 흔적까지 받는 사람에게 보여줘요.</span></li>
+      <li class="reveal-i"><span class="seal">서약 4</span><span><b>고백은 팔지 않음.</b> AI 학습에도, 광고에도 쓰이지 않아요. 돈을 내도 위로가 빨라지지 않아요.</span></li>
+    </ol>
+    <div class="demo reveal-i" id="demo" role="img" aria-label="답장을 쓰는 과정이 그대로 보이는 예시: 글자를 치고, 멈추고, 지우고, 다시 씁니다">
+      <span class="eyebrow">받게 될 답장은 이런 모습이에요</span>
+      <p class="replyText"><span id="demoText"></span><span class="caret"></span></p>
+      <p class="thinking" id="demoNote"></p>
+    </div>
+  </section>
+
+  <div class="appbar" id="appTop">
     <span class="streak" id="streak" hidden></span>
     <div class="bar">
       <nav class="seg" role="tablist" aria-label="화면 선택">
@@ -185,7 +225,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
       <button type="button" class="ghost sm careBtn" id="helpBtn" aria-expanded="false" aria-controls="help">마음이 힘들다면</button>
     </div>
     <section class="care" id="help" hidden aria-label="마음이 힘들 때 연락할 곳">
-      <strong>지금 많이 힘들다면, 사람에게 바로 연락할 수 있어요.</strong>
+      <strong>지금 혼자 견디기 벅차다면, 이곳 밖에도 당신의 이야기를 기다리는 사람들이 있어요.</strong>
       <ul class="nums">
         <li>지금 위험하다면 <span class="num"><a href="tel:119">119</a></span> (응급) · <span class="num"><a href="tel:112">112</a></span> (경찰)</li>
         <li>자살예방상담전화 <span class="num"><a href="tel:109">109</a></span> (24시간)</li>
@@ -194,12 +234,18 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
       </ul>
       <div class="small">이곳의 신부님은 전문 상담사가 아니라 평범한 사람이에요. 위기 상황의 도움을 대신할 수 없어요. 가까운 사람에게도 먼저 알려주세요. 이 안내는 이 화면 안에서만 떠요. 아무 데도 기록되거나 전송되지 않아요.</div>
     </section>
-  </header>
+  </div>
 
   <div class="view" id="confessView">
   <div class="stage" id="stage">
     <canvas id="c" aria-label="3D 성당 마당. 바닥을 누르면 고양이 캐릭터가 걸어가요."></canvas>
     <div class="fade" id="fade"></div>
+    <div class="gate" id="gate" role="dialog" aria-labelledby="gateTitle">
+      <p class="gateT" id="gateTitle">오늘 어떤 마음으로 오셨나요?</p>
+      <p class="gateS">들고 갈 촛불의 색을 골라주세요.</p>
+      <div class="chips" id="gateChips" role="group" aria-label="고민의 색"></div>
+      <button type="button" class="linkbtn gateSkip" id="gateSkip">고르지 않고 들어갈게요</button>
+    </div>
     <div class="hud top"><span class="chip" id="liveChip">다른 방문자는 예시예요</span><span class="chip" id="dutyChip">당직 신부님 3명</span><span class="chip" id="lit">켜진 촛불 0</span><span class="chip" id="mailChip" hidden></span></div>
     <div class="hud bottom" id="hudYard">
       <p class="status" id="status" aria-live="polite">바닥을 눌러 걸어보세요.</p>
@@ -279,7 +325,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
 
   <section class="care" id="care" hidden role="alert">
     <strong>많이 힘든 마음이 느껴져요.</strong>
-    <div>지금 누군가와 이야기하고 싶다면 언제든 연락할 수 있어요.<br>
+    <div>지금 혼자 견디기 벅차다면, 이곳 밖에도 당신의 이야기를 기다리는 사람들이 있어요.<br>
       자살예방상담전화 <span class="num">109</span> · 정신건강위기상담 <span class="num">1577-0199</span> (24시간)<br>
       지금 위험하다면 <span class="num">119</span></div>
     <div class="small">이 안내는 이 화면 안에서만 떴어요. 아무 데도 기록되거나 전송되지 않았어요.</div>
@@ -429,7 +475,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     <h3>처리하는 정보</h3>
     <ul>
       <li><b>실시간 마당</b>: 마당에 선 위치, 줄에 선 시각, 고민 색, 고양이 모양 번호, 당직 여부만 주고받아요. 연결할 때마다 새로 만든 무작위 번호로만 구분하고, 저장소에 기록하지 않아요. 연결이 끊기면 사라져요.</li>
-      <li><b>이 기기 안</b>(브라우저 저장소): 보속 일수, 받은 촛불 수, 소리 설정<span data-preview>, 오늘의 답장·넘기기 횟수</span>. 글 내용은 저장하지 않아요.</li>
+      <li><b>이 기기 안</b>(브라우저 저장소): 보속 일수, 받은 촛불 수, 소리 설정, 입장 안내를 봤는지<span data-preview>, 오늘의 답장·넘기기 횟수</span>. 글 내용은 저장하지 않아요.</li>
       <li data-live hidden><b>우편함 열쇠</b>: 이 기기에 저장되는 무작위 문자열이에요. 서버는 열쇠를 저장하지 않고, 열쇠에서 만든 해시값만 써서 내 우편함을 구분해요. 이름·이메일·IP 주소와 이어지지 않아요.</li>
       <li data-live hidden><b>맡긴 글</b>: 당직 신부님께 보낸 고해, 신부님의 답장과 쓰는 과정 기록, 답례를 암호화해서 보관해요. 하루 사용 횟수(해시 기준)는 3일, 신고 기록은 30일, 차단 기록은 60일 뒤 지워요.</li>
       <li><b>접속 정보</b>: 통신하려면 IP 주소가 Cloudflare 네트워크를 지나가요. 이 서비스는 요청 기록을 남기지 않게 설정했고, IP 주소를 저장하거나 분석하지 않아요. 다만 Cloudflare가 자체 보안·운영 목적으로 처리할 수 있어요.</li>
@@ -476,6 +522,11 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     <h3>지우기와 문의</h3>
     <p>이 기기에 남은 기록은 아래 버튼이나 브라우저의 사이트 데이터 삭제로 지울 수 있어요. 문의 창구는 곧 이 자리에 공개해요.</p>
     <div class="row"><button type="button" class="ghost sm" id="wipe">이 기기의 기록 지우기</button><span class="small" id="wipeMsg" aria-live="polite"></span></div>
+  </section>
+
+  <section class="about reveal-i" aria-label="만든 이의 편지">
+    <span class="eyebrow">만든 이의 편지</span>
+    <p class="confess">먼저 고백할게요. 이 고해소는 AI의 도움으로 지었어요. 그래서 위로만큼은 사람 손에 맡기기로 했어요.</p>
   </section>
 
   <footer>
@@ -1241,6 +1292,55 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
 </script>
 </div>
 
+<script>
+/* Landing: enter button, scroll reveal, and a small looping demo of what a reply looks like. No network. */
+(() => {
+  const $ = id => document.getElementById(id);
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  $('enter').addEventListener('click', () => {
+    $('appTop').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    setTimeout(() => { const b = document.querySelector('#gateChips button'); if (b && !$('gate').hidden) b.focus({ preventScroll: true }); }, reduce ? 0 : 700);
+  });
+  $('heroHelp').addEventListener('click', () => {
+    if ($('help').hidden) $('helpBtn').click(); else $('help').scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
+  });
+  if ('IntersectionObserver' in window && !reduce) {
+    document.documentElement.classList.add('reveal');
+    const items = [...document.querySelectorAll('.reveal-i')];
+    const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: .3 });
+    items.forEach(el => io.observe(el));
+  }
+  const dt = $('demoText'), dn = $('demoNote');
+  if (reduce || !('IntersectionObserver' in window)) {
+    dt.textContent = '그 무게를 혼자 들고 있었군요. 말해줘서 고마워요.';
+    dn.textContent = '쓰는 동안 멈추고, 지우고, 다시 쓴 흔적이 그대로 전해져요.';
+  } else {
+    let run = 0, on = false;
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    async function type(str, my, base) { for (const ch of str) { if (my !== run) return false; dt.textContent += ch; await sleep(base + Math.random() * 60); } return my === run; }
+    async function loop(my) {
+      while (my === run) {
+        dt.textContent = ''; dn.textContent = '';
+        if (!await type('그 무게를 혼자 들고 있었네', my, 85)) return;
+        dn.textContent = '… 4초 동안 멈춰 생각했어요'; dn.classList.add('pausing'); await sleep(2400); dn.classList.remove('pausing');
+        if (my !== run) return;
+        dn.textContent = '고쳐 쓰는 중…';
+        const kept = dt.textContent.slice(0, -1); dt.textContent = kept;
+        const g = document.createElement('span'); g.className = 'gone'; g.textContent = '네'; dt.appendChild(g);
+        await sleep(800); if (my !== run) return;
+        dt.textContent = kept; dn.textContent = '';
+        if (!await type('군요. 말해줘서 고마워요.', my, 85)) return;
+        await sleep(3200);
+      }
+    }
+    new IntersectionObserver(es => {
+      const v = es[es.length - 1].isIntersecting;
+      if (v && !on) { on = true; loop(++run); } else if (!v && on) { on = false; run++; }
+    }).observe($('demo'));
+  }
+})();
+</script>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (() => {
@@ -1308,6 +1408,20 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     pickEl.appendChild(b);
   });
   carry();
+
+  /* gate: choose the candle colour first, then step into the courtyard */
+  {
+    const gate = $('gate'), gc = $('gateChips'), pickEls = [...pickEl.children];
+    let entered = false;
+    try { if (localStorage.getItem('gohaeso.gate') === '1') { entered = true; gate.hidden = true; } } catch (e) {}   // returning visitors go straight in
+    const enter = () => { if (entered) return; entered = true; try { localStorage.setItem('gohaeso.gate', '1'); } catch (e) {} gate.classList.add('out'); setTimeout(() => { gate.hidden = true; }, reduce ? 0 : 950); };
+    TOPICS.forEach((tp, i) => {
+      const b = window.GOHAESO_CHIP(tp, false);
+      b.addEventListener('click', () => { if (pickEls[i]) pickEls[i].click(); enter(); });
+      gc.appendChild(b);
+    });
+    $('gateSkip').addEventListener('click', enter);
+  }
 
   /* send mode & on-duty priests (3 are examples) */
   const G = window.GOHAESO;
