@@ -152,7 +152,8 @@ select:focus-visible { outline: 2px solid var(--flame); outline-offset: 2px }
 .chk { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px }
 .chk input { margin-top: 4px; accent-color: var(--velvet) }
 .linkbtn { background: none; border: 0; padding: 0; margin: 0; font: inherit; font-weight: 500; color: inherit; text-decoration: underline; border-radius: 4px; cursor: pointer }
-.footlinks { display: flex; flex-wrap: wrap; gap: 6px 14px }
+.notifyBox{display:flex;flex-direction:column;align-items:flex-start;gap:.4rem;margin:.6rem 0}
+  .footlinks { display: flex; flex-wrap: wrap; gap: 6px 14px }
 .legal h3 { font-family: var(--serif); font-size: 15.5px; margin: 10px 0 0 }
 .legal h2 { font-family: var(--serif); font-size: 20px; margin: 0 }
 .legal p, .legal li { font-size: 13.5px; line-height: 1.7; margin: 0 }
@@ -189,6 +190,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
 .gateSkip { color: var(--hud-fg); opacity: .6; font-size: 12.5px }
 @media (prefers-reduced-motion: reduce) { .reveal .reveal-i { transition: none } .gate { transition: none } }
 @media (prefers-reduced-motion: reduce) { .smoke span { animation: none; opacity: 0 } .fade { transition: none } }
+  .notifyBox { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin: 10px 0 }
 </style>
 
 <div class="wrap">
@@ -339,6 +341,10 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
   <section class="panel" id="done" hidden>
     <p class="reply" id="reply"></p>
     <p class="small keytip" id="keyTip" hidden>🗝 이 기기에 우편함 열쇠가 만들어졌어요. 열쇠를 잃어버리면 저희도 우편함을 찾아드릴 방법이 없어요. 답장이 올 때까지 이 열쇠를 당신만의 비밀 수첩에 꼭 적어두세요. <a href="#privacy">열쇠 보러 가기</a></p>
+    <div class="notifyBox" data-live hidden>
+      <p class="small notifyMsg" aria-live="polite"></p>
+      <button type="button" class="ghost sm notifyBtn" hidden>편지 오면 알려주세요 🔔</button>
+    </div>
     <div class="oneLine" id="oneLineBox" hidden>
       <span class="eyebrow">먼저 다녀간 사람의 한 줄 · 예시</span>
       <p id="oneLine"></p>
@@ -478,6 +484,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
       <li><b>실시간 마당</b>: 마당에 선 위치, 줄에 선 시각, 고민 색, 고양이 모양 번호, 당직 여부만 주고받아요. 연결할 때마다 새로 만든 무작위 번호로만 구분하고, 저장소에 기록하지 않아요. 연결이 끊기면 사라져요.</li>
       <li><b>이 기기 안</b>(브라우저 저장소): 작은 일을 한 날 수, 받은 촛불 수, 소리 설정, 입장 안내를 봤는지<span data-preview>, 오늘의 답장·넘기기 횟수</span>. 글 내용은 저장하지 않아요.</li>
       <li data-live hidden><b>우편함 열쇠</b>: 이 기기에 저장되는 무작위 문자열이에요. 서버는 열쇠를 저장하지 않고, 열쇠에서 만든 해시값만 써서 내 우편함을 구분해요. 이름·이메일·IP 주소와 이어지지 않아요.</li>
+      <li data-live hidden><b>알림 주소</b>(알림을 켠 경우에만): 브라우저가 만든 무작위 알림 주소를 암호화해서, 답장이 오가는 동안만 보관하고 끝나면 지워요. 알림에는 글이 없고 "편지가 도착했어요"라는 고정된 한 줄만 나가요. 알림은 Google·Apple·Mozilla 같은 브라우저의 알림 서비스를 거쳐요. 그곳에는 알림이 갔다는 사실만 남을 수 있어요.</li>
       <li data-live hidden><b>맡긴 글</b>: 당직 신부님께 보낸 고해, 신부님의 답장과 쓰는 과정 기록, 답례를 암호화해서 보관해요. 하루 사용 횟수(해시 기준)는 3일, 신고 기록은 30일, 차단 기록은 60일 뒤 지워요.</li>
       <li><b>접속 정보</b>: 통신하려면 IP 주소가 Cloudflare 네트워크를 지나가요. 이 서비스는 요청 기록을 남기지 않게 설정했고, IP 주소를 저장하거나 분석하지 않아요. 다만 Cloudflare가 자체 보안·운영 목적으로 처리할 수 있어요.</li>
     </ul>
@@ -519,6 +526,10 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
       <input id="keyField" type="text" readonly hidden aria-label="우편함 열쇠" autocomplete="off" spellcheck="false">
       <div class="row"><button type="button" class="ghost sm" id="keyShow">열쇠 보기</button><button type="button" class="ghost sm" id="keyUse">열쇠 넣기</button><button type="button" class="ghost sm" id="keyErase">맡긴 글 지우고 열쇠 버리기</button></div>
       <p class="small" id="keyMsg" aria-live="polite"></p>
+      <div class="notifyBox" data-live hidden>
+        <p class="small notifyMsg" aria-live="polite"></p>
+        <button type="button" class="ghost sm notifyBtn" hidden>편지 오면 알려주세요 🔔</button>
+      </div>
     </div>
     <h3>지우기와 문의</h3>
     <p>이 기기에 남은 기록은 아래 버튼이나 브라우저의 사이트 데이터 삭제로 지울 수 있어요. 문의 창구는 곧 이 자리에 공개해요.</p>
@@ -1495,6 +1506,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     $('proofAlone').hidden = duty; $('proofDuty').hidden = !duty;
     let told = false; try { told = localStorage.getItem('gohaeso.keyTold') === '1'; } catch {}
     $('keyTip').hidden = !(mailLive && duty) || told;
+    if (mailLive && duty) refreshNotify();
     if (mailLive && duty) { try { localStorage.setItem('gohaeso.keyTold', '1'); } catch {} }
     $('penance').textContent = pick(PENANCE);
     $('didMsg').textContent = ''; $('did').disabled = false;
@@ -1669,6 +1681,30 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     renderMail();
   }
   document.addEventListener('gohaeso:me', () => { if (G.mailLive && G.me) syncMine(G.me.mine); });
+  /* letter-arrived notifications: a fixed line only, never any text */
+  const NOTIFY = {
+    on: ['알림을 켰어요. 편지가 도착하면 알려드려요. 알림에는 글이 담기지 않아요.', '알림 끄기'],
+    off: ['편지가 도착하면 알림으로 알려드릴까요? 알림에는 글이 담기지 않고, 도착했다는 사실만 전해져요.', '편지 오면 알려주세요 🔔'],
+    denied: ['이 브라우저에서 알림이 꺼져 있어요. 브라우저 설정에서 이 사이트의 알림을 켜면 받을 수 있어요.', ''],
+    install: ["iPhone에서는 공유 버튼에서 '홈 화면에 추가'로 앱처럼 연 다음에 알림을 켤 수 있어요. 그 전에는 우편 시간(오전 7시·낮 12시 30분·밤 9시)에 들러주세요.", ''],
+    unsupported: ['이 브라우저는 알림을 지원하지 않아요. 우편 시간(오전 7시·낮 12시 30분·밤 9시)에 들러주세요.', ''],
+    error: ['알림을 켜지 못했어요. 잠시 뒤 다시 눌러주세요.', '편지 오면 알려주세요 🔔']
+  };
+  let notifyBusy = false;
+  function paintNotify(st) {
+    const [msg, label] = NOTIFY[st] || NOTIFY.off;
+    document.querySelectorAll('.notifyBox').forEach(b => {
+      b.querySelector('.notifyMsg').textContent = msg;
+      const btn = b.querySelector('.notifyBtn'); btn.hidden = !label; btn.textContent = label; btn.disabled = false; btn.dataset.st = st;
+    });
+  }
+  async function refreshNotify() { if (G.mailLive && API && API.push) paintNotify(await API.push.state()); }
+  document.querySelectorAll('.notifyBtn').forEach(btn => btn.addEventListener('click', async () => {
+    if (notifyBusy || !API || !API.push) return;
+    notifyBusy = true; document.querySelectorAll('.notifyBtn').forEach(b => { b.disabled = true; });
+    try { paintNotify(btn.dataset.st === 'on' ? await API.push.disable() : await API.push.enable()); } finally { notifyBusy = false; }
+  }));
+  document.addEventListener('gohaeso:live', refreshNotify);
   document.addEventListener('gohaeso:live', () => {
     mail = null; saveMail(null); renderMail(); renderDuty();
     $('letterEyebrow').textContent = '우체통에 도착한 답장';

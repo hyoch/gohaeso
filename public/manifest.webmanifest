@@ -1,0 +1,16 @@
+{
+  "name": "작은 고해소",
+  "short_name": "고해소",
+  "description": "AI 디톡스 고해소. 사람만 손수 대답해요.",
+  "lang": "ko",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#2a2140",
+  "theme_color": "#2a2140",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

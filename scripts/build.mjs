@@ -24,6 +24,10 @@ const html = `<!doctype html>
 <meta property="og:description" content="${desc}">
 <meta property="og:type" content="website">
 <meta name="theme-color" content="#2a2140">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="고해소">
 <meta name="referrer" content="no-referrer">
 <style>
 :root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px) }

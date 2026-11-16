@@ -32,6 +32,42 @@
       } catch (e) { return { ok: false, status: 0, data: { error: 'network' } }; }
     }
   };
+  /* letter-arrived notifications (Web Push). The push itself carries no text. */
+  const toBytes = b => { const p = b.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((b.length + 3) % 4); const r = atob(p); return Uint8Array.from(r, c => c.charCodeAt(0)); };
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) && !(navigator.standalone || (matchMedia && matchMedia('(display-mode: standalone)').matches));
+  API.push = {
+    supported: () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window,
+    needsInstall: () => ios,                                    // iPhone only allows notifications for sites added to the Home Screen
+    async state() {
+      if (!API.push.supported()) return ios ? 'install' : 'unsupported';
+      if (Notification.permission === 'denied') return 'denied';
+      try {
+        const reg = await navigator.serviceWorker.getRegistration('/');
+        const sub = reg && await reg.pushManager.getSubscription();
+        return sub && Notification.permission === 'granted' ? 'on' : 'off';
+      } catch (e) { return 'off'; }
+    },
+    async enable() {
+      if (!API.push.supported()) return ios ? 'install' : 'unsupported';
+      const perm = await Notification.requestPermission();            // must run straight from the tap
+      if (perm !== 'granted') return 'denied';
+      try {
+        const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+        await navigator.serviceWorker.ready;
+        const k = await API.call('GET', 'pushkey'); if (!k.ok) return 'error';
+        const old = await reg.pushManager.getSubscription(); if (old) await old.unsubscribe();
+        const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: toBytes(k.data.key) });
+        const r = await API.call('POST', 'push', { endpoint: sub.endpoint });
+        if (!r.ok) { await sub.unsubscribe(); return 'error'; }
+        return 'on';
+      } catch (e) { return 'error'; }
+    },
+    async disable() {
+      await API.call('POST', 'unpush', {});
+      try { const reg = await navigator.serviceWorker.getRegistration('/'); const sub = reg && await reg.pushManager.getSubscription(); if (sub) await sub.unsubscribe(); } catch (e) {}
+      return 'off';
+    }
+  };
   API.ready = API.health().then(j => (API.live = !!(j && j.ok)));
   window.GOHAESO_API = API;
 })();

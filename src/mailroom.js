@@ -10,7 +10,12 @@ const err = (s, e) => ({ s, d: { error: e } });
 const ok = d => ({ s: 200, d });
 const rid = () => [...crypto.getRandomValues(new Uint8Array(8))].map(b => b.toString(16).padStart(2, '0')).join('');
 const OPEN = "('waiting','assigned','reading')";
-const OPS = new Set(['me', 'duty', 'confess', 'claim', 'start', 'pass', 'reply', 'letter', 'thanks', 'warm', 'report', 'block', 'forget']);
+const OPS = new Set(['me', 'duty', 'confess', 'claim', 'start', 'pass', 'reply', 'letter', 'thanks', 'warm', 'report', 'block', 'forget', 'pushkey', 'push', 'unpush']);
+
+// Web Push (letter-arrived notifications). Only these push services are ever contacted, so a visitor cannot make the server call any other address.
+const PUSH_HOSTS = [/^fcm\.googleapis\.com$/, /(^|\.)push\.apple\.com$/, /(^|\.)push\.services\.mozilla\.com$/, /(^|\.)notify\.windows\.com$/];
+const b64u = buf => { let s = ''; new Uint8Array(buf).forEach(x => { s += String.fromCharCode(x); }); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+const b64uStr = str => b64u(new TextEncoder().encode(str));
 
 function safeEq(a, b) {
   const x = new TextEncoder().encode(String(a)), y = new TextEncoder().encode(String(b));
@@ -46,6 +51,10 @@ export class Mailroom extends DurableObject {
     s('CREATE TABLE IF NOT EXISTS block(who TEXT NOT NULL, other TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(who, other))');
     s('CREATE TABLE IF NOT EXISTS duty(who TEXT PRIMARY KEY, seen INTEGER NOT NULL)');
     s('CREATE TABLE IF NOT EXISTS usage(who TEXT NOT NULL, day TEXT NOT NULL, kind TEXT NOT NULL, n INTEGER NOT NULL, PRIMARY KEY(who, day, kind))');
+    s('CREATE TABLE IF NOT EXISTS push(who TEXT PRIMARY KEY, ct BLOB NOT NULL, iv BLOB NOT NULL, created INTEGER NOT NULL)');
+    s('CREATE TABLE IF NOT EXISTS vapid(id INTEGER PRIMARY KEY CHECK(id=1), pub TEXT NOT NULL, ct BLOB NOT NULL, iv BLOB NOT NULL)');
+    s('CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT NOT NULL)');
+    try { s('ALTER TABLE reply ADD COLUMN notified INTEGER NOT NULL DEFAULT 0'); } catch {}
     s(`CREATE TABLE IF NOT EXISTS report(id TEXT PRIMARY KEY, kind TEXT NOT NULL, conf_id TEXT NOT NULL, target TEXT NOT NULL,
        reason TEXT NOT NULL, by TEXT NOT NULL, created INTEGER NOT NULL)`);
   }
@@ -106,6 +115,8 @@ export class Mailroom extends DurableObject {
     this.run('DELETE FROM thanks WHERE conf_id NOT IN (SELECT id FROM conf)');
     this.run('DELETE FROM passed WHERE conf_id NOT IN (SELECT id FROM conf)');
     this.run('DELETE FROM duty WHERE seen<?', now - this.L.DUTY_TTL_MS);
+    // a notification address is kept only while a thread is open (plus a day of grace), then forgotten
+    this.run(`DELETE FROM push WHERE created<? AND who NOT IN (SELECT owner FROM conf WHERE state IN ('waiting','assigned','reading','answered'))`, now - 864e5);
     this.run('DELETE FROM report WHERE created<?', now - this.L.REPORT_KEEP_MS);
     this.run('DELETE FROM block WHERE at<?', now - 60 * 864e5);
     this.run('DELETE FROM usage WHERE day<?', kstDay(now - 3 * 864e5));
@@ -115,10 +126,79 @@ export class Mailroom extends DurableObject {
     const busy = this.q(`SELECT 1 FROM conf WHERE state IN ${OPEN} LIMIT 1`).length > 0;
     const any = busy || this.q('SELECT 1 FROM conf LIMIT 1').length > 0 || this.q('SELECT 1 FROM duty LIMIT 1').length > 0;
     if (!any) return;
-    const want = Date.now() + (busy ? 5 * 60e3 : 3600e3), cur = await this.ctx.storage.getAlarm();
+    let want = Date.now() + (busy ? 5 * 60e3 : 3600e3);
+    // wake up exactly when a letter is due for someone who asked to be notified
+    const due = this.q(`SELECT MIN(r.deliver) d FROM reply r JOIN conf c ON c.id=r.conf_id JOIN push p ON p.who=c.owner
+                        WHERE r.notified=0 AND r.hidden=0 AND c.state='answered'`)[0];
+    if (due && due.d !== null) want = Math.min(want, Math.max(due.d, Date.now() + 1000));
+    const cur = await this.ctx.storage.getAlarm();
     if (cur === null || cur > want) await this.ctx.storage.setAlarm(want);
   }
-  async alarm() { this.sweep(Date.now()); await this.arm(); }
+  async alarm() {
+    const now = Date.now();
+    this.sweep(now);
+    try { await this.notifyDue(now); } catch {}
+    await this.arm();
+  }
+
+  /* ---------- letter-arrived notifications (Web Push, no payload) ---------- */
+  // The push carries no text at all. The service worker shows a fixed line, so the push service learns nothing about the letter.
+  async vapidKeys() {
+    if (this._vapid) return this._vapid;
+    const row = this.q('SELECT pub, ct, iv FROM vapid WHERE id=1')[0];
+    if (row) {
+      try {
+        const jwk = JSON.parse(await this.vault.open(row.ct, row.iv, 'vapid'));
+        const priv = await crypto.subtle.importKey('jwk', jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+        return (this._vapid = { pub: row.pub, priv });
+      } catch { this.run('DELETE FROM vapid'); this.run('DELETE FROM push'); }   // MASTER_KEY changed: old keys and addresses are unreadable
+    }
+    const kp = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+    const pub = b64u(await crypto.subtle.exportKey('raw', kp.publicKey));
+    const jwk = await crypto.subtle.exportKey('jwk', kp.privateKey);
+    const sealed = await this.vault.seal(JSON.stringify(jwk), 'vapid');
+    this.run('INSERT OR REPLACE INTO vapid(id, pub, ct, iv) VALUES(1,?,?,?)', pub, sealed.ct, sealed.iv);
+    const priv = await crypto.subtle.importKey('jwk', jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+    return (this._vapid = { pub, priv });
+  }
+
+  pushUrl(endpoint) {
+    if (typeof endpoint !== 'string' || endpoint.length > 600) return null;
+    let u; try { u = new URL(endpoint); } catch { return null; }
+    const dev = this.L.PUSH_ALLOW_HOST;                                   // local tests only; never set in production
+    if (dev && u.host === dev) return u;
+    if (u.protocol !== 'https:' || u.username || u.password || u.port) return null;
+    return PUSH_HOSTS.some(re => re.test(u.hostname)) ? u : null;
+  }
+
+  async sendPush(url) {
+    const { pub, priv } = await this.vapidKeys();
+    const origin = (this.q(`SELECT v FROM kv WHERE k='origin'`)[0] || {}).v || 'https://example.invalid';
+    const head = b64uStr(JSON.stringify({ typ: 'JWT', alg: 'ES256' }));
+    const body = b64uStr(JSON.stringify({ aud: url.origin, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: origin }));
+    const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, priv, new TextEncoder().encode(head + '.' + body));
+    const r = await fetch(url.toString(), {
+      method: 'POST', signal: AbortSignal.timeout(6000),
+      headers: { TTL: '86400', Urgency: 'normal', Authorization: `vapid t=${head}.${body}.${b64u(sig)}, k=${pub}` }
+    });
+    return r.status;
+  }
+
+  async notifyDue(now) {
+    const rows = this.q(`SELECT r.conf_id id, c.owner who FROM reply r JOIN conf c ON c.id=r.conf_id
+                         WHERE r.notified=0 AND r.hidden=0 AND r.deliver<=? AND c.state='answered' LIMIT 20`, now);
+    for (const r of rows) {
+      this.run('UPDATE reply SET notified=1 WHERE conf_id=?', r.id);          // at most once per letter
+      const p = this.q('SELECT ct, iv FROM push WHERE who=?', r.who)[0];
+      if (!p) continue;
+      try {
+        const url = this.pushUrl(await this.vault.open(p.ct, p.iv, 'push:' + r.who));
+        if (!url) { this.run('DELETE FROM push WHERE who=?', r.who); continue; }
+        const st = await this.sendPush(url);
+        if (st === 404 || st === 410) this.run('DELETE FROM push WHERE who=?', r.who);   // the browser dropped the subscription
+      } catch { /* the letter is still in the mailbox; the notification is only a convenience */ }
+    }
+  }
 
   /* ---------- views ---------- */
   heldRow(who, id) {
@@ -168,6 +248,29 @@ export class Mailroom extends DurableObject {
       mine, held,
       feedback: { warm: this.q('SELECT COALESCE(SUM(warm),0) w FROM reply WHERE author=?', who)[0].w, thanks }
     });
+  }
+
+  async do_pushkey(who, b, now) {
+    this.rememberOrigin(b);
+    return ok({ key: (await this.vapidKeys()).pub });
+  }
+  rememberOrigin(b) {
+    if (typeof b._origin === 'string' && /^https:\/\/[a-z0-9.-]+$/i.test(b._origin) || (this.L.PUSH_ALLOW_HOST && typeof b._origin === 'string')) {
+      this.run(`INSERT INTO kv(k, v) VALUES('origin', ?) ON CONFLICT(k) DO UPDATE SET v=excluded.v`, b._origin);
+    }
+  }
+  async do_push(who, b, now) {
+    const url = this.pushUrl(b.endpoint);
+    if (!url) return err(400, 'bad_endpoint');
+    this.rememberOrigin(b);
+    await this.vapidKeys();
+    const s = await this.vault.seal(url.toString(), 'push:' + who);
+    this.run('INSERT INTO push(who, ct, iv, created) VALUES(?,?,?,?) ON CONFLICT(who) DO UPDATE SET ct=excluded.ct, iv=excluded.iv, created=excluded.created', who, s.ct, s.iv, now);
+    return ok({ on: true });
+  }
+  async do_unpush(who, b, now) {
+    this.run('DELETE FROM push WHERE who=?', who);
+    return ok({ on: false });
   }
 
   async do_duty(who, b, now) {
@@ -338,6 +441,7 @@ export class Mailroom extends DurableObject {
   // "Erase what I left here": my confession thread goes now. Replies I wrote stay with their readers but lose my link.
   async do_forget(who, b, now) {
     this.run('DELETE FROM duty WHERE who=?', who);
+    this.run('DELETE FROM push WHERE who=?', who);
     this.run('DELETE FROM passed WHERE who=?', who);
     this.run(`UPDATE reply SET author='' WHERE author=?`, who);
     this.run(`UPDATE conf SET state='waiting', holder=NULL, assigned=NULL, started=NULL WHERE holder=?`, who);

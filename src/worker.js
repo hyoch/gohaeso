@@ -100,6 +100,9 @@ const ROUTES = {
   'POST /api/report': ['report', 1024, true],
   'POST /api/block': ['block', 1024, true],
   'POST /api/forget': ['forget', 1024, true],
+  'GET /api/pushkey': ['pushkey', 0, true],
+  'POST /api/push': ['push', 2048, true],
+  'POST /api/unpush': ['unpush', 1024, true],
   'GET /api/admin/reports': ['admin_reports', 0, true],
   'POST /api/admin/resolve': ['admin_resolve', 1024, true]
 };
@@ -134,6 +137,7 @@ async function api(request, env, url) {
     try { body = JSON.parse(raw); } catch { return reply(400, { error: 'bad_json' }); }
     if (!body || typeof body !== 'object' || Array.isArray(body)) return reply(400, { error: 'bad_json' });
   }
+  body._origin = url.origin;            // set here, never taken from the visitor
   try {
     const out = await env.MAILROOM.get(env.MAILROOM.idFromName('main')).op(name, key, request.headers.get('CF-Connecting-IP') || '', body);
     return name === 'health' ? plain(out.d) : reply(out.s, out.d);
