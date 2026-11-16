@@ -303,22 +303,6 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     <div class="chips" id="topicPick" role="group" aria-label="고민 영역"></div>
   </div>
   <p class="small" id="hint">바닥을 누르면 그쪽으로 걸어가요. 성당 문 앞에 다가가면 줄에 서요.</p>
-  <div class="row">
-    <button type="button" class="ghost sm" id="offerBtn" aria-expanded="false" aria-controls="offer">촛불 봉헌</button>
-    <span class="small" id="offerNote"></span>
-  </div>
-
-  <section class="panel" id="offer" hidden>
-    <span class="eyebrow">촛불 봉헌 · 미리보기</span>
-    <p class="small">봉헌금은 서버비와 신부님 교육에 쓰이고, 사용 내역은 매달 공개해요. 봉헌해도 답장이 빨라지거나 달라지지 않아요.</p>
-    <div class="chips" id="offerAmt" role="group" aria-label="봉헌 금액">
-      <button type="button" class="chip-t" data-a="1000" aria-pressed="true" style="--c:#e9c56a"><span class="dot"></span>1,000원</button>
-      <button type="button" class="chip-t" data-a="3000" aria-pressed="false" style="--c:#e9c56a"><span class="dot"></span>3,000원</button>
-      <button type="button" class="chip-t" data-a="5000" aria-pressed="false" style="--c:#e9c56a"><span class="dot"></span>5,000원</button>
-    </div>
-    <div class="row"><span class="small">실제 결제는 아직 연결되지 않았어요.</span><button class="primary" id="offerGo">봉헌 촛불 켜기</button></div>
-  </section>
-
   <section class="panel" id="letter" hidden>
     <div class="row"><span class="eyebrow" id="letterEyebrow">우체통에 도착한 답장 · 예시</span><button class="ghost sm" id="letterClose">편지 접기</button></div>
     <div class="letterOut">
@@ -588,8 +572,8 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
   <footer>
     <span class="footlinks"><button type="button" class="linkbtn" id="footPrivacy" aria-expanded="false" aria-controls="privacy">개인정보 처리방침 · 이용 수칙</button><button type="button" class="linkbtn" id="footHelp">마음이 힘들다면</button><span>문의 <b>help@gohaeso.space</b></span></span>
     <span>로그인 없음 · 외부 글꼴과 분석 도구 없음 · 혼자 털어놓은 글은 저장되지 않아요</span>
-    <span data-preview>이곳은 성사가 아닌 쉼터예요. 같은 링크로 들어온 사람은 실시간으로 마당에 보여요. 이름도 글도 오가지 않고 위치와 줄 순서만 오가요. 당직 신부님께 보내기, 우편함의 고해, 우체통 편지, 촛불 봉헌은 아직 미리보기예요.</span>
-    <span data-live hidden>이곳은 성사가 아닌 쉼터예요. 마당에서는 이름도 글도 오가지 않고 위치와 줄 순서만 오가요. 당직 신부님께 맡긴 글은 암호화되어 보관되고, 기한이 지나면 지워져요. 촛불 봉헌은 아직 미리보기예요.</span>
+    <span data-preview>이곳은 성사가 아닌 쉼터예요. 같은 링크로 들어온 사람은 실시간으로 마당에 보여요. 이름도 글도 오가지 않고 위치와 줄 순서만 오가요. 당직 신부님께 보내기, 우편함의 고해, 우체통 편지는 아직 미리보기예요.</span>
+    <span data-live hidden>이곳은 성사가 아닌 쉼터예요. 마당에서는 이름도 글도 오가지 않고 위치와 줄 순서만 오가요. 당직 신부님께 맡긴 글은 암호화되어 보관되고, 기한이 지나면 지워져요.</span>
   </footer>
 
 <script>
@@ -1636,7 +1620,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     '털어놓느라 많이 망설였을 것 같아요. 그 마음을 들고 여기까지 와준 것만으로도 저는 고마워요.\n\n완벽하게 괜찮아지지 않아도 돼요. 오늘은 조금만 덜 무거우면 그걸로 됐어요.',
     '읽으면서 저도 비슷한 날이 떠올랐어요. 그때 누가 "그럴 수 있어"라고 말해줬으면 좋았겠다 싶었어요. 그래서 제가 대신 말할게요. 그럴 수 있어요.\n\n내일 아침엔 창문을 조금 열고 시작해 봐요.'
   ];
-  let onMailChange = null, onAssign = null, onOffer = null;
+  let onMailChange = null, onAssign = null;
   const saveMail = m => { try { m ? localStorage.setItem(MAILKEY, JSON.stringify(m)) : localStorage.removeItem(MAILKEY); } catch (e) {} };
   let mail = (() => {
     try {
@@ -1796,19 +1780,6 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
   }
   $('letterReplay').addEventListener('click', () => { const my = ++letterTok; G.replay($('letterText'), $('letterThinking'), letterLog, letterFinal, () => my === letterTok); });
   $('letterClose').addEventListener('click', () => { letterTok++; });
-
-  /* ---------- offering candle (preview, no payment) ---------- */
-  let offers = 0;
-  const amtBtns = [...document.querySelectorAll('#offerAmt .chip-t')];
-  amtBtns.forEach(b => b.addEventListener('click', () => amtBtns.forEach(x => x.setAttribute('aria-pressed', x === b))));
-  $('offerBtn').addEventListener('click', () => {
-    const open = $('offer').hidden; $('offer').hidden = !open; $('offerBtn').setAttribute('aria-expanded', open);
-  });
-  $('offerGo').addEventListener('click', () => {
-    offers++; $('offer').hidden = true; $('offerBtn').setAttribute('aria-expanded', false);
-    $('offerNote').textContent = `봉헌 촛불 ${offers}개를 켰어요. 미리보기라 결제는 되지 않았어요.`;
-    if (onOffer) onOffer(); if (SFX) SFX.chime();
-  });
 
   if (!gl3d) {
     renderMail();
@@ -2136,18 +2107,6 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
   /* an assigned priest's window flickers for a minute */
   let assignT = 0, assignWin = 0;
   onAssign = () => { assignT = 60; assignWin = rnd(Math.max(1, Math.min(dutyCount(), wins.length))); };
-
-  /* offering candles: a gold row in front of the stand */
-  const offerCandles = [];
-  for (let i = 0; i < 6; i++) {
-    const g = new THREE.Group(); g.position.set(-3.45 + i * .3, .8, -3.42); g.visible = false;
-    g.add(mk(new THREE.CylinderGeometry(.05, .05, .32, 8), M('#e9c56a'), 0, .16, 0));
-    g.add(mk(new THREE.ConeGeometry(.04, .12, 6), B('#ffd27a'), 0, .38, 0, false));
-    const gl = glowSprite('#ffd27a', .55); gl.position.y = .38; g.add(gl);
-    yard.add(g); offerCandles.push(g);
-  }
-  yard.add(mk(new THREE.BoxGeometry(2.1, .06, .3), M('#5a3a2a'), -2.7, .77, -3.42));
-  onOffer = () => { const c = offerCandles[(offers - 1) % offerCandles.length]; if (c) c.visible = true; };
 
   me.position.set(0, 0, 9); me.rotation.y = Math.PI; yard.add(me);
   me.userData.noJoinUntil = 0;
