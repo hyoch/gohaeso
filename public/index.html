@@ -155,6 +155,10 @@ button { font: inherit; cursor: pointer; border: 0; border-radius: 999px; paddin
 .thinking { font-size: 12.5px; color: var(--muted); min-height: 1.4em; margin: 0 }
 .thinking.pausing { animation: blink 1.4s steps(1) infinite }
 .gone { text-decoration: line-through; opacity: .4; transition: opacity .35s }
+.trace { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px }
+.chip { font-size: 12.5px; padding: 4px 10px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--muted) 35%, transparent); color: var(--muted); transition: background .25s, color .25s, border-color .25s }
+.chip b { font-variant-numeric: tabular-nums; font-weight: 600 }
+.chip.on { color: var(--ink); border-color: var(--flame); background: color-mix(in srgb, var(--flame) 18%, transparent) }
 @media (prefers-reduced-motion: reduce) { .thinking.pausing { animation: none } }
 
 .dutyInfo { margin: 0; background: var(--glow); border-radius: 10px; padding: 10px 12px; font-size: 13.5px }
@@ -241,6 +245,11 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     <div class="demo reveal-i" id="demo" role="img" aria-label="답장을 쓰는 과정이 그대로 보이는 예시: 글자를 치고, 멈추고, 지우고, 다시 씁니다">
       <span class="eyebrow">받게 될 답장은 이런 모습이에요</span>
       <p class="replyText"><span id="demoText"></span><span class="caret"></span></p>
+      <div class="trace" id="demoTrace" aria-hidden="true">
+        <span class="chip" id="chPause">멈춤 <b id="pauseSec">0</b>초</span>
+        <span class="chip" id="chFix">고쳐 씀 <b id="fixN">0</b>번</span>
+        <span class="chip on" id="chHand">손으로 쓴 시간 <b id="handT">0:00</b></span>
+      </div>
       <p class="thinking" id="demoNote"></p>
     </div>
   </section>
@@ -1373,23 +1382,31 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
   if (reduce || !('IntersectionObserver' in window)) {
     dt.textContent = '그 무게를 혼자 들고 있었군요. 말해줘서 고마워요.';
     dn.textContent = '쓰는 동안 멈추고, 지우고, 다시 쓴 흔적이 그대로 전해져요.';
+    $('pauseSec').textContent = '4'; $('fixN').textContent = '1'; $('handT').textContent = '0:31';
+    ['chPause', 'chFix', 'chHand'].forEach(id => $(id).classList.add('on'));
   } else {
-    let run = 0, on = false;
+    let run = 0, on = false, t0 = 0;
     const sleep = ms => new Promise(r => setTimeout(r, ms));
-    async function type(str, my, base) { for (const ch of str) { if (my !== run) return false; dt.textContent += ch; await sleep(base + Math.random() * 60); } return my === run; }
+    const clock = () => { const s = Math.round((Date.now() - t0) / 1000); $('handT').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+    async function type(str, my, base) { for (const ch of str) { if (my !== run) return false; dt.textContent += ch; clock(); await sleep(base + Math.random() * 60); } return my === run; }
     async function loop(my) {
       while (my === run) {
         dt.textContent = ''; dn.textContent = '';
+        $('pauseSec').textContent = '0'; $('fixN').textContent = '0'; $('handT').textContent = '0:00';
+        $('chPause').classList.remove('on'); $('chFix').classList.remove('on'); t0 = Date.now();
         if (!await type('그 무게를 혼자 들고 있었네', my, 85)) return;
-        dn.textContent = '… 4초 동안 멈춰 생각했어요'; dn.classList.add('pausing'); await sleep(2400); dn.classList.remove('pausing');
-        if (my !== run) return;
-        dn.textContent = '고쳐 쓰는 중…';
+        $('chPause').classList.add('on'); dn.classList.add('pausing');
+        for (let s = 1; s <= 4; s++) { dn.textContent = '손을 멈추고 생각하는 중… ' + s + '초'; $('pauseSec').textContent = s; await sleep(1000); if (my !== run) return; }
+        dn.classList.remove('pausing'); t0 += 4000;
+        dn.textContent = '한 글자를 지우고 고쳐 써요';
         const kept = dt.textContent.slice(0, -1); dt.textContent = kept;
         const g = document.createElement('span'); g.className = 'gone'; g.textContent = '네'; dt.appendChild(g);
-        await sleep(800); if (my !== run) return;
+        $('fixN').textContent = '1'; $('chFix').classList.add('on');
+        await sleep(1100); if (my !== run) return;
         dt.textContent = kept; dn.textContent = '';
         if (!await type('군요. 말해줘서 고마워요.', my, 85)) return;
-        await sleep(3200);
+        dn.textContent = '이 멈춤과 고친 흔적이 받는 분께 그대로 보여요.';
+        await sleep(3600);
       }
     }
     new IntersectionObserver(es => {
