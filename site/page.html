@@ -293,6 +293,7 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
       <p class="small" id="letterProof"></p>
       <p class="thinking" id="letterThinking"></p>
       <div class="row"><button class="ghost sm" id="letterReplay" hidden>쓰는 과정 다시 보기</button><button class="ghost sm" id="letterWarm">따뜻했어요 🕯</button><button type="button" class="ghost sm" id="reportLetter">어긋난 마음 알리기</button></div>
+      <div class="row"><button type="button" class="ghost sm" id="letterSave">편지 간직하기</button><span class="small" id="saveMsg" aria-live="polite"></span></div>
     </div>
     <label class="hint" for="thanksBox">신부님께 짧은 답례</label>
     <textarea id="thanksBox" class="short" maxlength="200" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
@@ -547,6 +548,11 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
       <li>신고는 메일이 아니라 화면의 '어긋난 마음 알리기'로 해주세요. 그래야 신고한 그 한 통만 안전하게 확인할 수 있어요.</li>
       <li>위기 상황은 메일로 도움을 받을 수 없어요. 화면의 '마음이 힘들다면' 버튼에서 바로 연결되는 전화를 이용해주세요.</li>
     </ul>
+    <div id="donate" hidden>
+      <h3>이 공간의 운영비</h3>
+      <p>서버비는 운영자가 먼저 부담하고, 광고도 데이터 판매도 하지 않아요. 마음이 닿았다면 서버비를 보태주셔도 좋아요. 돈을 내도 답장이 빨라지거나 달라지지 않아요.</p>
+      <p><a id="donateLink" href="#" target="_blank" rel="noopener noreferrer">후원하기</a></p>
+    </div>
     <div class="row"><button type="button" class="ghost sm" id="wipe">이 기기의 기록 지우기</button><span class="small" id="wipeMsg" aria-live="polite"></span></div>
   </section>
 
@@ -556,7 +562,7 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
   </section>
 
   <footer>
-    <span class="footlinks"><button type="button" class="linkbtn" id="footPrivacy" aria-expanded="false" aria-controls="privacy">개인정보 처리방침 · 이용 수칙</button><button type="button" class="linkbtn" id="footHelp">마음이 힘들다면</button><span>문의 <b>help@gohaeso.space</b></span></span>
+    <span class="footlinks"><button type="button" class="linkbtn" id="footPrivacy" aria-expanded="false" aria-controls="privacy">개인정보 처리방침 · 이용 수칙</button><button type="button" class="linkbtn" id="footHelp">마음이 힘들다면</button><a class="linkbtn" id="footDonate" href="#" target="_blank" rel="noopener noreferrer" hidden>후원하기</a><span>문의 <b>help@gohaeso.space</b></span></span>
     <span>로그인 없음 · 외부 글꼴과 분석 도구 없음 · 혼자 털어놓은 글은 저장되지 않아요</span>
     <span data-preview>이곳은 성사가 아닌 쉼터예요. 같은 링크로 들어온 사람은 실시간으로 마당에 보여요. 이름도 글도 오가지 않고 위치와 줄 순서만 오가요. 당직 신부님께 보내기, 우편함의 고해, 우체통 편지는 아직 미리보기예요.</span>
     <span data-live hidden>이곳은 성사가 아닌 쉼터예요. 마당에서는 이름도 글도 오가지 않고 위치와 줄 순서만 오가요. 당직 신부님께 맡긴 글은 암호화되어 보관되고, 기한이 지나면 지워져요.</span>
@@ -1787,6 +1793,46 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
   }
   $('letterReplay').addEventListener('click', () => { const my = ++letterTok; G.replay($('letterText'), $('letterThinking'), letterLog, letterFinal, () => my === letterTok); });
   $('letterClose').addEventListener('click', () => { letterTok++; });
+  /* keepsake: the letter becomes a picture made on this device only; nothing is sent anywhere */
+  $('letterSave').addEventListener('click', async () => {
+    const msg = $('saveMsg'), text = $('letterText').textContent, proof = $('letterProof').textContent;
+    if (!text) return;
+    try {
+      const W = 1080, pad = 96, maxW = W - pad * 2, SERIF = '"Noto Serif KR","Noto Serif CJK KR","Nanum Myeongjo",AppleMyungjo,serif';
+      const size = text.length > 600 ? 32 : text.length > 300 ? 38 : 46, lh = Math.round(size * 1.7);
+      const probe = document.createElement('canvas').getContext('2d');
+      const wrap = (str, font) => { probe.font = font; const out = []; for (const para of str.split('\n')) { let line = ''; for (const ch of para) { if (probe.measureText(line + ch).width > maxW) { out.push(line); line = ch === ' ' ? '' : ch; } else line += ch; } out.push(line); } return out; };
+      const body = wrap(text, `${size}px ${SERIF}`), pr = wrap(proof, `28px ${SERIF}`);
+      const H = Math.max(1350, 250 + body.length * lh + 90 + pr.length * 44 + 190);
+      const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+      const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#2d2547'); bg.addColorStop(1, '#16131c'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+      const glow = g.createRadialGradient(W / 2, 110, 4, W / 2, 110, 150); glow.addColorStop(0, 'rgba(255,200,120,.55)'); glow.addColorStop(1, 'rgba(255,200,120,0)'); g.fillStyle = glow; g.fillRect(0, 0, W, 300);
+      g.fillStyle = '#ffb24a'; g.beginPath(); g.ellipse(W / 2, 112, 15, 28, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#f1e9de'; g.fillRect(W / 2 - 14, 136, 28, 60);
+      g.textAlign = 'center'; g.fillStyle = '#c9bfd8'; g.font = `30px ${SERIF}`; g.fillText('작은 고해소', W / 2, 250);
+      g.textAlign = 'left'; g.fillStyle = '#f4eefa'; g.font = `${size}px ${SERIF}`;
+      let y = 340; body.forEach(l => { g.fillText(l, pad, y); y += lh; });
+      y += 50; g.fillStyle = '#b9b1c5'; g.font = `28px ${SERIF}`; pr.forEach(l => { g.fillText(l, pad, y); y += 44; });
+      g.textAlign = 'center'; g.fillStyle = '#8f86a0'; g.font = `26px ${SERIF}`;
+      g.fillText(`사람이 손수 쓴 답장 · ${new Date().toLocaleDateString('ko-KR')} · gohaeso.space`, W / 2, H - 70);
+      const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+      if (!blob) throw new Error('blob');
+      const file = new File([blob], 'gohaeso-letter.png', { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file] }); msg.textContent = '이 기기에서만 만든 그림이에요. 서버에는 남지 않아요.'; return; } catch (e) { if (e && e.name === 'AbortError') return; }
+      }
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'gohaeso-letter.png'; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      msg.textContent = '그림으로 저장했어요. 이 기기에서만 만들어져 서버에는 남지 않아요.';
+    } catch (e) { msg.textContent = '지금은 저장하지 못했어요. 잠시 뒤 다시 눌러주세요.'; }
+  });
+  /* optional donation link: shown only when the site is built with one */
+  (() => {
+    const u = window.GOHAESO_DONATE;
+    if (typeof u !== 'string' || !/^https:\/\//.test(u)) return;
+    ['donateLink', 'footDonate'].forEach(id => { $(id).href = u; });
+    $('donate').hidden = false; $('footDonate').hidden = false;
+  })();
 
   if (!gl3d) {
     renderMail();

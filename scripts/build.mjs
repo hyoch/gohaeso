@@ -12,6 +12,11 @@ const CDN = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
 if (!page.includes(CDN)) throw new Error('three.js script tag not found in site/page.html');
 page = page.replace(CDN, '/three.min.js');
 
+// Optional donation link (site/config.json). Left empty, no donation text or link appears anywhere.
+let donate = '';
+try { donate = String(JSON.parse(readFileSync(new URL('../site/config.json', import.meta.url), 'utf8')).donateUrl || ''); } catch (e) {}
+if (donate && !/^https:\/\/[^\s"'<>\\]+$/.test(donate)) throw new Error('site/config.json donateUrl must be a plain https URL');
+const donateTag = donate ? `<script>window.GOHAESO_DONATE=${JSON.stringify(donate)}</script>\n` : '';
 const CANON = 'gohaeso.space';   // keep in sync with CANONICAL_HOST in wrangler.jsonc
 const desc = 'AI 디톡스 고해소. 붙여넣기도 AI 답장도 없이, 사람만 손수 대답해요.';
 const html = `<!doctype html>
@@ -39,7 +44,7 @@ img { max-width: 100% }
 </style>
 </head>
 <body>
-<script src="/realtime.js"></script>
+${donateTag}<script src="/realtime.js"></script>
 <script src="/mail.js"></script>
 ${page}
 </body>
