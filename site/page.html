@@ -124,6 +124,9 @@ button { font: inherit; cursor: pointer; border: 0; border-radius: 999px; paddin
 .caret { display: inline-block; width: 2px; height: 1.1em; background: var(--flame); vertical-align: -2px; animation: blink 1s steps(1) infinite }
 @keyframes blink { 50% { opacity: 0 } }
 .thinking { font-size: 12.5px; color: var(--muted); min-height: 1.4em; margin: 0 }
+.thinking.pausing { animation: blink 1.4s steps(1) infinite }
+.gone { text-decoration: line-through; opacity: .4; transition: opacity .35s }
+@media (prefers-reduced-motion: reduce) { .thinking.pausing { animation: none } }
 
 .dutyInfo { margin: 0; background: var(--glow); border-radius: 10px; padding: 10px 12px; font-size: 13.5px }
 .oneLine { background: var(--bg); border-radius: 12px; padding: 12px 14px; display: grid; gap: 6px }
@@ -249,6 +252,13 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     </div>
   </section>
 
+  <section class="panel" id="farewell" hidden>
+    <p class="reply" id="farewellText">충분히 아파하고 위로받았기를. 이제 이 고민은 세상에서 완전히 사라졌어요.</p>
+    <p class="small">약속한 대로 당신의 고해와 받은 답장은 모두 지워졌어요.</p>
+    <div class="smoke" id="farewellSmoke" hidden></div>
+    <div class="row"><button class="primary" id="farewellOk">태워 보내기</button></div>
+  </section>
+
   <section class="panel" id="write" hidden>
     <label class="hint" for="confession">여기엔 신부님과 당신뿐이에요. 천천히 적어보세요.</label>
     <p class="small" id="carry"></p>
@@ -351,7 +361,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     </details>
 
     <section class="panel" id="listen" hidden>
-      <p class="hint">먼저 끝까지 들어주세요.</p>
+      <p class="hint">고해를 다 읽으셨군요. 답장을 쓰기 전, 상대를 위해 크게 심호흡을 세 번 해볼까요?</p>
       <p class="small">AI는 0.1초 만에 답하지만, 여기서는 고해를 다 읽고 30초 동안 숨을 고른 뒤에 써요.</p>
       <div class="breath" id="breath" aria-hidden="true"></div>
       <div class="row"><span class="small" id="listenLeft" aria-live="polite"></span><button class="primary" id="listenBtn">다 읽었어요</button></div>
@@ -799,11 +809,11 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
 
   ['paste', 'drop', 'dragover'].forEach(ev => box.addEventListener(ev, e => {
     e.preventDefault();
-    if (ev !== 'dragover') warn('붙여넣기는 할 수 없어요. 여기서는 당신 손으로 쓴 말만 전해져요.');
+    if (ev !== 'dragover') warn('이곳에서는 모든 글을 손으로 꾹꾹 눌러 씁니다. 천천히 당신의 온기를 담아주세요.');
   }));
   box.addEventListener('beforeinput', e => {
-    if (BLOCK.has(e.inputType)) { e.preventDefault(); warn('붙여넣기와 자동 교정은 막혀 있어요. 직접 타이핑해 주세요.'); return; }
-    if (e.inputType === 'insertText' && e.data && e.data.length > MAX_BURST) { e.preventDefault(); warn('한 번에 많은 글자가 들어왔어요. 직접 타이핑해 주세요.'); }
+    if (BLOCK.has(e.inputType)) { e.preventDefault(); warn('이곳에서는 모든 글을 손으로 꾹꾹 눌러 씁니다. 천천히 당신의 온기를 담아주세요.'); return; }
+    if (e.inputType === 'insertText' && e.data && e.data.length > MAX_BURST) { e.preventDefault(); warn('이곳에서는 모든 글을 손으로 꾹꾹 눌러 씁니다. 천천히 당신의 온기를 담아주세요.'); }
   });
   box.addEventListener('compositionstart', () => composing = true);
   box.addEventListener('compositionend', () => composing = false);
@@ -812,7 +822,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     const d = diff(prev, box.value);
     const isComp = composing || e.isComposing || e.inputType === 'insertCompositionText';
     if (BLOCK.has(e.inputType) || (!isComp && d.ins.length > MAX_BURST) || (isComp && d.ins.length > MAX_BURST * 2)) {
-      revert(); warn('한 번에 많은 글자가 들어왔어요. 직접 타이핑해 주세요.'); return;
+      revert(); warn('이곳에서는 모든 글을 손으로 꾹꾹 눌러 씁니다. 천천히 당신의 온기를 담아주세요.'); return;
     }
     if (!t0) t0 = now;
     log.push({ t: Math.round(now - t0), at: d.at, del: d.del, ins: d.ins, c: isComp ? 1 : 0 });
@@ -1045,19 +1055,25 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
   async function playTrace(out, think, log, finalText, alive) {
     let text = '';
     const caret = document.createElement('span'); caret.className = 'caret';
-    const paint = at => { out.textContent = text.slice(0, at); out.appendChild(caret); out.appendChild(document.createTextNode(text.slice(at))); };
+    const paint = (at, gone) => {
+      out.textContent = text.slice(0, at);
+      if (gone) { const g = document.createElement('span'); g.className = 'gone'; g.textContent = gone; out.appendChild(g); }
+      out.appendChild(caret); out.appendChild(document.createTextNode(text.slice(at)));
+    };
     paint(0);
     const sleep = ms => new Promise(r => setTimeout(r, ms));
     for (let i = 0; i < log.length; i++) {
       if (!alive()) return;
       const ev = log[i], gap = i ? ev.t - log[i - 1].t : 0;
-      if (gap > 2000) { think.textContent = `… ${Math.round(gap / 1000)}초 동안 멈춰 생각했어요`; await sleep(reduce ? 0 : 900); }
+      if (gap > 2000) { think.textContent = `… ${Math.round(gap / 1000)}초 동안 멈춰 생각했어요`; think.classList.add('pausing'); await sleep(reduce ? 0 : 1300); think.classList.remove('pausing'); }
       else if (gap > 0) await sleep(reduce ? 0 : Math.min(gap / 2.5, 220));
       if (!alive()) return;
       if (ev.del && !ev.ins && !ev.c) think.textContent = '고쳐 쓰는 중…';
       else if (gap <= 2000) think.textContent = '';
+      const gone = ev.del && !ev.c ? text.slice(ev.at, ev.at + ev.del) : '';
       text = text.slice(0, ev.at) + ev.ins + text.slice(ev.at + ev.del);
-      paint(ev.at + ev.ins.length);
+      paint(ev.at + ev.ins.length, gone);
+      if (gone) await sleep(reduce ? 0 : 380);
       const S = window.GOHAESO_SFX;
       if (S) { if (ev.del && !ev.ins && !ev.c) S.eraser(); else if (ev.ins) S.pencil(); }
     }
@@ -1458,10 +1474,10 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
   }
   const thanks = $('thanksBox'), THANK_BLOCK = new Set(['insertFromPaste', 'insertFromPasteAsQuotation', 'insertFromDrop', 'insertFromYank', 'insertReplacementText', 'insertLink']);
   const sayThanks = m => { const w = $('thanksWarn'); w.textContent = m; w.hidden = false; setTimeout(() => { w.hidden = true; }, 3500); };
-  ['paste', 'drop'].forEach(ev => thanks.addEventListener(ev, e => { e.preventDefault(); sayThanks('답례도 붙여넣기 없이, 손으로 직접 써주세요.'); }));
+  ['paste', 'drop'].forEach(ev => thanks.addEventListener(ev, e => { e.preventDefault(); sayThanks('답례도 손으로 꾹꾹 눌러 써주세요. 짧아도 괜찮아요.'); }));
   thanks.addEventListener('dragover', e => e.preventDefault());
   thanks.addEventListener('beforeinput', e => {
-    if (THANK_BLOCK.has(e.inputType) || (e.inputType === 'insertText' && e.data && e.data.length > 12)) { e.preventDefault(); sayThanks('답례도 붙여넣기 없이, 손으로 직접 써주세요.'); }
+    if (THANK_BLOCK.has(e.inputType) || (e.inputType === 'insertText' && e.data && e.data.length > 12)) { e.preventDefault(); sayThanks('답례도 손으로 꾹꾹 눌러 써주세요. 짧아도 괜찮아요.'); }
   });
   thanks.addEventListener('input', () => { $('thanksSend').disabled = thanks.value.trim().length < 2; if (SFX) SFX.pencil(); });
   $('letterWarm').addEventListener('click', async () => {
@@ -1499,14 +1515,32 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
   const dismissed = () => { try { return localStorage.getItem(DK); } catch (e) { return null; } };
   let letterLog = [], letterFinal = '', letterTok = 0, careShown = false;
   const NOTE = {
-    waiting: '고해가 신부님을 기다리고 있어요',
-    assigned: '한 신부님께 배정됐어요',
-    reading: '신부님이 읽고 있어요',
+    waiting: '누군가 당신의 고해를 읽을 차례를 기다리고 있어요',
+    assigned: '한 분께 닿았어요. 곧 읽기 시작해요',
+    reading: '누군가 당신의 고해를 읽고, 어떤 말을 건넬지 오래 망설이고 있어요',
     expired: '48시간 안에 아무도 답하지 못해 글을 지웠어요 · 눌러서 닫기',
     care: '걱정되는 마음이 전해졌어요 · 눌러서 닫기',
     closed: '이 고해는 안전 점검으로 닫혔어요 · 눌러서 닫기'
   };
+  const TK = 'gohaeso.thread';
+  const threadEnd = () => { try { return +localStorage.getItem(TK) || 0; } catch (e) { return 0; } };
+  function farewell() {
+    const end = threadEnd();
+    if (!end || end > Date.now() || !$('farewell').hidden) return;
+    $('farewellSmoke').hidden = true; $('farewellText').hidden = false; $('farewellOk').hidden = false;
+    $('farewell').hidden = false; $('farewell').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+  }
+  $('farewellOk').addEventListener('click', () => {
+    try { localStorage.removeItem(TK); } catch (e) {}
+    const sm = $('farewellSmoke'); sm.textContent = '';
+    $('farewellText').textContent.split(/(\s+)/).forEach((w, i) => { const sp = document.createElement('span'); sp.textContent = w; sp.style.animationDelay = `${Math.min(i * 90, 900)}ms`; sm.appendChild(sp); });
+    $('farewellText').hidden = true; $('farewellOk').hidden = true; sm.hidden = false;
+    if (SFX) SFX.whoosh();
+    setTimeout(() => { $('farewell').hidden = true; }, reduce ? 300 : 2800);
+  });
   function syncMine(m) {
+    if (m && m.state === 'answered') { try { localStorage.setItem(TK, String(m.deleteAt)); } catch (e) {} }
+    else if (!m) farewell();
     mail = null;
     if (m && m.state === 'answered') mail = { at: m.ready ? 0 : m.deliverAt, until: m.deleteAt };
     else if (m && NOTE[m.state]) {
