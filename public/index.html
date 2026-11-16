@@ -1854,19 +1854,35 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     const robeMesh = mk(new THREE.ConeGeometry(.42, .9, 8), M(robe), 0, .45, 0); body.add(robeMesh);
     const head = new THREE.Group(); head.position.set(0, 1.02, 0); body.add(head);
     const h = mk(new THREE.SphereGeometry(.34, 14, 10), furM); h.scale.set(1, .88, .92); head.add(h);
+    const eyes = [];
     [-1, 1].forEach(s => {
       const e = mk(new THREE.ConeGeometry(.12, .24, 4), furM, s * .19, .28, 0); e.rotation.z = -s * .3; head.add(e);
       const ei = mk(new THREE.ConeGeometry(.06, .13, 4), M('#e8a9b6'), s * .19, .27, .045, false); ei.rotation.z = -s * .3; head.add(ei);
-      head.add(mk(new THREE.BoxGeometry(.11, .028, .02), B(dark ? '#f4f1f6' : '#2a2433'), s * .12, .02, .3, false));
+      const eye = mk(new THREE.BoxGeometry(.1, .046, .02), B(dark ? '#f4f1f6' : '#2a2433'), s * .12, .02, .3, false); head.add(eye); eyes.push(eye);
       body.add(mk(new THREE.SphereGeometry(.08, 8, 6), furM, s * .15, .58, .22));
     });
     head.add(mk(new THREE.SphereGeometry(.036, 6, 6), B('#e08a9a'), 0, -.05, .31, false));
     const tail = mk(new THREE.TorusGeometry(.22, .05, 6, 12, Math.PI), furM, 0, .32, -.36); tail.rotation.y = Math.PI / 2; body.add(tail);
     const collar = mk(new THREE.BoxGeometry(.13, .09, .04), B('#f4f1f6'), 0, .52, .18, false);
     collar.visible = priest; body.add(collar);
+    // priest look: a gold stole and a small lantern instead of a candle, so a listening cat is told apart at a glance
+    const stoleM = M('#e0b650');
+    const scarf = new THREE.Group(); scarf.visible = false;
+    const ring = mk(new THREE.TorusGeometry(.25, .055, 6, 16), stoleM, 0, .72, 0, false); ring.rotation.x = Math.PI / 2; scarf.add(ring);
+    scarf.add(mk(new THREE.BoxGeometry(.1, .4, .03), stoleM, .1, .52, .26, false), mk(new THREE.BoxGeometry(.1, .04, .035), M('#f4f1f6'), .1, .34, .262, false));
+    body.add(scarf);
+    const lantern = new THREE.Group(); lantern.position.set(-.3, .62, .3); lantern.visible = false;
+    lantern.add(mk(new THREE.BoxGeometry(.15, .2, .15), B('#ffd27a'), 0, .16, 0, false));
+    lantern.add(mk(new THREE.ConeGeometry(.12, .08, 4), M('#4b2b1a'), 0, .3, 0, false), mk(new THREE.BoxGeometry(.17, .03, .17), M('#4b2b1a'), 0, .05, 0, false));
+    const lh = mk(new THREE.TorusGeometry(.06, .012, 5, 10, Math.PI), M('#4b2b1a'), 0, .33, 0, false); lantern.add(lh);
+    const lglow = glowSprite('#ffb24a', 1.7); lglow.position.y = .17; lantern.add(lglow);
+    const lpool = new THREE.Mesh(new THREE.CircleGeometry(1.35, 24), new THREE.MeshBasicMaterial({ color: '#ffb24a', transparent: true, opacity: .26, depthWrite: false, blending: THREE.AdditiveBlending }));
+    lpool.rotation.x = -Math.PI / 2; lpool.position.set(0, -.58, 0); lantern.add(lpool);
+    body.add(lantern);
     if (name) { const lb = label(name, me, candle, topic); lb.position.y = topic ? 1.92 : 1.78; root.add(lb); }
     root.userData = { body, head, tail, target: null, onArrive: null, speed: me ? 2.6 : 1.4 + rf() * .4,
-      droop: !priest, hopT: 0, t: rf() * 10, entering: false, candle: null, robeMesh, collar, robeColor: robe };
+      droop: !priest, hopT: 0, t: rf() * 10, entering: false, candle: null, robeMesh, collar, robeColor: robe,
+      eyes, scarf, lantern, lglow, blinkT: 2 + rf() * 4, blink: 0, bow: 0, wag: 0 };
     if (candle) {
       // a larger candle with a clear coloured flame, and a soft pool of the same colour on the ground, so the colour reads from afar
       const g = new THREE.Group(); g.position.set(.26, .62, .3);
@@ -1876,9 +1892,16 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
       g.add(flame, glow); body.add(g);
       const pool = new THREE.Mesh(new THREE.CircleGeometry(.95, 24), new THREE.MeshBasicMaterial({ color: candle, transparent: true, opacity: .34, depthWrite: false, blending: THREE.AdditiveBlending }));
       pool.rotation.x = -Math.PI / 2; pool.position.y = .03; root.add(pool);
-      root.userData.candle = { flame, glow, pool };
+      root.userData.candle = { flame, glow, pool, g };
     }
+    if (priest) setPriestLook(root, true);
     return root;
+  }
+  function setPriestLook(c, on) {
+    const u = c.userData;
+    u.collar.visible = on; u.scarf.visible = on; u.lantern.visible = on;
+    if (u.candle) u.candle.g.visible = !on;
+    u.robeMesh.material.color.set(on ? '#15111a' : u.robeColor);
   }
   function goTo(c, v, cb) { c.userData.target = V(v.x, 0, v.z); c.userData.onArrive = cb || null; }
   function stepCat(c, dt) {
@@ -1898,10 +1921,17 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
       if (!reduce) { const p = 1 - u.hopT / 1.2; y = Math.abs(Math.sin(p * Math.PI * 3)) * .55 * (1 - p * .6); }
     }
     u.body.position.y = y;
-    const tilt = u.droop ? .34 : -.06;
+    // idle: slow breathing and a slow blink, so nothing stands stiff
+    u.body.scale.y = moving || reduce ? 1 : 1 + Math.sin(u.t * 1.7) * .014;
+    u.blinkT -= dt;
+    if (u.blinkT <= 0) { u.blink = .4; u.blinkT = 3 + rf() * 4.5; }
+    if (u.blink > 0) { u.blink = Math.max(0, u.blink - dt); const k = Math.sin((1 - u.blink / .4) * Math.PI); u.eyes.forEach(e => { e.scale.y = 1 - .85 * k; }); }
+    if (u.bow > 0) u.bow = Math.max(0, u.bow - dt);
+    if (u.wag > 0) u.wag = Math.max(0, u.wag - dt);
+    const tilt = (u.droop ? .34 : -.06) + (u.bow > 0 ? Math.sin((1 - u.bow / 1.6) * Math.PI) * .5 : 0);
     u.head.rotation.x += (tilt - u.head.rotation.x) * Math.min(1, dt * 4);
     u.head.rotation.z = moving ? 0 : Math.sin(u.t * 1.3) * .06;
-    u.tail.rotation.x = Math.sin(u.t * (u.droop ? 1.5 : 4)) * (u.droop ? .12 : .35);
+    u.tail.rotation.x = u.wag > 0 ? Math.sin(u.t * 9) * .6 : Math.sin(u.t * (u.droop ? 1.5 : 4)) * (u.droop ? .12 : .35);
     if (u.candle) u.candle.glow.scale.setScalar(1.0 * (.92 + .08 * Math.sin(u.t * 14) * Math.sin(u.t * 5.7)));
   }
 
@@ -2058,7 +2088,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     const n = Math.min(dutyCount(), wins.length);
     winLight.intensity = n * .32;
     wins.forEach((w, i) => { const on = i < n; w.m.material.map = on ? winLit : winDark; w.m.material.needsUpdate = true; w.gl.visible = on; });
-    const u = me.userData; u.robeMesh.material.color.set(G.onDuty ? '#15111a' : u.robeColor); u.collar.visible = G.onDuty;
+    setPriestLook(me, !!G.onDuty);
   };
   onDutyChange();
 
@@ -2129,8 +2159,28 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     if (lit % flames.length === 0) setTimeout(() => flames.forEach(f => f.visible = false), 1600);
   }
 
+  /* send-off: the priest steps out through the door, nods once and wags the tail as someone leaves lighter (about 3 seconds) */
+  const yardPriest = makeCat({ fur: '#3a3140', robe: '#15111a', priest: true, name: '신부님' });
+  yardPriest.visible = false; yard.add(yardPriest);
+  let priestOut = false;
+  const toPoint = (c, v) => new Promise(res => goTo(c, v, res));
+  async function sendOff(who) {
+    if (priestOut) return;
+    priestOut = true;
+    try {
+      const p = yardPriest, side = who.position.x >= 0 ? -1 : 1;
+      p.position.copy(IN); p.rotation.y = 0; p.visible = true; p.userData.entering = true; doorTarget = 1;
+      await toPoint(p, V(side * 1.45, 0, -3.3));
+      doorTarget = 0;
+      p.rotation.y = Math.atan2(who.position.x - p.position.x, who.position.z - p.position.z);
+      p.userData.bow = reduce ? 0 : 1.6; p.userData.wag = reduce ? 0 : 2.6;
+      await wait(reduce ? 500 : 2600);
+      doorTarget = 1; await toPoint(p, IN); doorTarget = 0;
+    } finally { yardPriest.visible = false; yardPriest.userData.entering = false; priestOut = false; }
+  }
+
   async function serve() {
-    if (doorBusy || inside || !queue.length) return;
+    if (doorBusy || inside || !queue.length || priestOut) return;
     const f = queue[0];
     if (f.userData.target || f.position.distanceTo(slot(0)) > .25) return;
     doorBusy = true;
@@ -2144,6 +2194,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
       f.position.copy(IN); f.visible = true; f.userData.droop = false; f.userData.entering = false; doorTarget = 1;
       goTo(f, V(0, 0, -2.4), () => {
         f.userData.hopT = 1.2; lightCandle(f.userData.topic.color); doorTarget = 0; doorBusy = false;
+        if (rf() < .3) sendOff(f);
         setTimeout(() => goTo(f, exitPoint(), () => despawn(f)), reduce ? 100 : 1100);
       });
     }));
@@ -2224,7 +2275,8 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     $('status').textContent = '가벼워진 발걸음으로 나왔어요.';
     goTo(me, V(0, 0, -2.4), () => {
       me.userData.hopT = 1.2; lightCandle(myTopic.color); doorTarget = 0; doorBusy = false;
-      setTimeout(() => goTo(me, V(2.4, 0, 1.8)), reduce ? 100 : 1100);
+      sendOff(me);
+      setTimeout(() => goTo(me, V(2.4, 0, 1.8)), reduce ? 100 : 1500);
     });
   });
   $('join').addEventListener('click', join);
@@ -2326,7 +2378,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
       }
       const prev = r.st; r.s = s; r.upd = pr.updatedAt;
       setCandle(r.c, topicOf(s.tp).color);
-      const u = r.c.userData; u.robeMesh.material.color.set(s.duty ? '#15111a' : u.robeColor); u.collar.visible = s.duty;
+      setPriestLook(r.c, !!s.duty);
       if (prev !== s.st) transition(r, prev, s.st);
       else if (s.st === 'walk' && !r.busy) goTo(r.c, V(s.x, 0, s.z));
     }
@@ -2362,7 +2414,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     relayoutLive(); updateStatus();
   }
   async function liveServe() {
-    if (doorBusy || inside || !meQueued || me.userData.entering) return;
+    if (doorBusy || inside || !meQueued || me.userData.entering || priestOut) return;
     const q = liveQueue();
     if (!q.length || !q[0].me || occupant()) return;
     if (me.userData.target || me.position.distanceTo(slot(0)) > .25) return;
@@ -2484,6 +2536,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
       stepCat(me, dt);
       if (me.userData.target && me.visible) { stepT -= dt; if (stepT <= 0) { if (SFX) SFX.step(); stepT = .32; } } else stepT = 0;
       npcs.forEach(c => stepCat(c, dt));
+      if (yardPriest.visible) stepCat(yardPriest, dt);
       wanderers.forEach(w => { if (!w.userData.target && rf() < dt * .25) goTo(w, randPoint()); });
       flagP.rotation.z += ((flagUp ? 0 : -Math.PI / 2) - flagP.rotation.z) * Math.min(1, dt * 3);
       if (waitGlow.visible) waitGlow.scale.setScalar(.7 + .15 * Math.sin(t * 2));
