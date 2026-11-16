@@ -15,6 +15,8 @@
   ],
   // The real address. Visitors who arrive on the old *.workers.dev address are sent here, so a mailbox key is never split across two addresses.
   "vars": { "CANONICAL_HOST": "gohaeso.space" },
+  // The domain is attached to this Worker here, so every deploy keeps it (and creates it if it is missing).
+  "routes": [{ "pattern": "gohaeso.space", "custom_domain": true }],
   // No request logs are collected: this service promises not to keep traces of visitors.
   "observability": { "enabled": false }
   // Secrets (set in the Cloudflare dashboard, never in git):
