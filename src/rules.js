@@ -38,13 +38,21 @@ export const CONTACT_ANY = /(01[016789][-\s.]?\d{3,4}[-\s.]?\d{4})|([\w.+-]+@[\w
 const KST = 9 * 3600e3;
 export const kstDay = ms => new Date(ms + KST).toISOString().slice(0, 10);
 
-// Slow mail: the next 07:00 (Korea time) that is at least 6 hours away.
+// Slow mail: letters go out at fixed "post times" (Korea time), never instantly.
+// The next post time that is at least 1 hour away.
+export const POST_TIMES = [[7, 0], [12, 30], [21, 0]];
+export const MIN_WAIT_MS = 3600e3;
 export function nextDeliver(ms) {
   const d = new Date(ms + KST);
-  d.setUTCHours(7, 0, 0, 0);
-  let t = d.getTime() - KST;
-  while (t < ms + 6 * 3600e3) t += 864e5;
-  return t;
+  d.setUTCHours(0, 0, 0, 0);
+  const day0 = d.getTime() - KST;                           // today 00:00 KST
+  for (let add = 0; add < 3; add++) {
+    for (const [h, m] of POST_TIMES) {
+      const t = day0 + add * 864e5 + (h * 60 + m) * 60e3;
+      if (t >= ms + MIN_WAIT_MS) return t;
+    }
+  }
+  return ms + 864e5;
 }
 
 // Writing-trace events travel as [t, at, del, ins, composing]. Returns stats, or null when the trace is not a genuine

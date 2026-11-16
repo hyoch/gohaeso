@@ -1478,7 +1478,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     const nDuty = dutyCount();
     const mailLive = !!G.mailLive;
     $('reply').textContent = !duty ? pick(REPLIES)
-      : mailLive && nDuty ? '고해를 맡겼어요. 오래 기다린 순서로 당직 신부님 한 분께 배정돼요. 답장은 느린 우편으로 아침 우체통에 도착해요.'
+      : mailLive ? '우체통에 고해를 넣었어요. 이곳의 시간은 바깥보다 조금 느리게 흘러요. 누군가 읽고 손으로 답장을 쓸 때까지 마음 편히 기다려주세요. 답장은 정해진 우편 시간(오전 7시·낮 12시 30분·밤 9시)에 도착하고, 48시간 안에 아무도 답하지 못하면 글은 지워져요.'
       : nDuty ? `당직 신부님${live ? ' 한 분' : ` '${pick(DUTY_SAMPLE)}'`}께 배정됐어요. 지금 성당 창문의 촛불이 깜빡이고 있어요. 답장은 느린 우편으로 내일 아침 우체통에 도착해요.`
       : '편지로 맡겨뒀어요. 48시간 안에 신부님이 답하면 우체통에 조용히 도착해요. 아무도 읽지 못하면 그대로 지워지고, 그 사실도 정직하게 알려드릴게요.';
     $('oneLineBox').hidden = !duty; $('peekRow').hidden = !duty || mailLive;
@@ -1611,11 +1611,11 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
         sayThanks(e === 'contact' ? '답례에는 연락처나 링크를 넣을 수 없어요.' : e === 'already' ? '답례는 한 번만 보낼 수 있어요.' : '지금은 보내지 못했어요. 잠시 뒤 다시 눌러주세요.');
         $('thanksSend').disabled = thanks.value.trim().length < 2; return;
       }
-      thanks.value = ''; thanks.disabled = true; $('thanksMsg').textContent = '답례를 전했어요. 읽은 날부터 7일 뒤 이 편지는 지워져요.';
+      thanks.value = ''; thanks.disabled = true; $('thanksMsg').textContent = '답례를 전했어요. 우체통이 닫혔어요. 두 사람의 인연은 여기서 따뜻하게 마무리돼요. 읽은 날부터 7일 뒤 이 편지는 지워져요.';
       document.dispatchEvent(new CustomEvent('gohaeso:poke')); return;
     }
     thanks.value = ''; $('thanksSend').disabled = true;
-    $('thanksMsg').textContent = '답례를 전했어요. 이 편지는 7일 뒤 지워져요.';
+    $('thanksMsg').textContent = '답례를 전했어요. 우체통이 닫혔어요. 두 사람의 인연은 여기서 따뜻하게 마무리돼요. 이 편지는 7일 뒤 지워져요.';
     mail = null; saveMail(null); renderMail();
   });
   $('letterClose').addEventListener('click', () => { $('letter').hidden = true; });
@@ -1635,8 +1635,8 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
   const NOTE = {
     waiting: '누군가 당신의 고해를 읽을 차례를 기다리고 있어요',
     assigned: '한 분께 닿았어요. 곧 읽기 시작해요',
-    reading: '누군가 당신의 고해를 읽고, 어떤 말을 건넬지 오래 망설이고 있어요',
-    expired: '48시간 안에 아무도 답하지 못해 글을 지웠어요 · 눌러서 닫기',
+    reading: '한 분이 당신의 고해를 읽고 있어요 · 시간이 지나면 다음 분께 넘어갈 수도 있어요',
+    expired: '48시간 동안 아무도 답하지 못했어요. 고해는 작은 별빛이 되어 흩어졌고 글은 지웠어요. 닿지 못한 건 당신 탓이 아니에요. 털어놓은 용기만큼 짐이 가벼워졌기를 바라요 · 눌러서 닫기',
     care: '걱정되는 마음이 전해졌어요 · 눌러서 닫기',
     closed: '이 고해는 안전 점검으로 닫혔어요 · 눌러서 닫기'
   };
