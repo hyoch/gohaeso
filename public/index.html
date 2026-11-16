@@ -165,6 +165,10 @@ select:focus-visible { outline: 2px solid var(--flame); outline-offset: 2px }
 .breath { width: 72px; height: 72px; border-radius: 50%; justify-self: center; background: var(--glow);
   border: 2px solid var(--flame); transform: scale(.6) }
 .breath.on { animation: breathe 8s ease-in-out infinite }
+#listenBtn.filling { position: relative; overflow: hidden; opacity: .8; cursor: default }
+#listenBtn.filling::after { content: ''; position: absolute; inset: 0; background: rgba(255,255,255,.3); transform-origin: left; transform: scaleX(0); animation: readfill var(--fill, 10s) linear forwards }
+@keyframes readfill { to { transform: scaleX(1) } }
+@media (prefers-reduced-motion: reduce) { #listenBtn.filling::after { animation: none; transform: scaleX(.5) } }
 @keyframes breathe { 0%, 100% { transform: scale(.6) } 50% { transform: scale(1) } }
 @media (prefers-reduced-motion: reduce) { .breath.on { animation: none; transform: scale(.85) } }
 
@@ -438,8 +442,8 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
     </details>
 
     <section class="panel" id="listen" hidden>
-      <p class="hint">고해를 다 읽으셨군요. 답장을 쓰기 전, 상대를 위해 크게 심호흡을 세 번 해볼까요?</p>
-      <p class="small">AI는 0.1초 만에 답하지만, 여기서는 고해를 다 읽고 잠시 숨을 고른 뒤에 써요. 글이 길수록 조금 더 오래 고요해져요.</p>
+      <p class="hint" id="listenHint">천천히 읽어주세요. 다 읽으면 버튼이 따뜻하게 켜져요.</p>
+      <p class="small">AI는 0.1초 만에 답하지만, 여기서는 읽는 시간을 충분히 드려요. 글이 길수록 조금 더 오래 걸려요.</p>
       <div class="breath" id="breath" aria-hidden="true"></div>
       <div class="row"><span class="small" id="listenLeft" aria-live="polite"></span><button class="primary" id="listenBtn">다 읽었어요</button></div>
     </section>
@@ -829,13 +833,27 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
   const repliesLeft = () => live ? (me ? me.today.repliesLeft : 3) : Math.max(0, 3 - dayCount(RK));
   const passesLeft = () => live ? (me ? me.today.passesLeft : 2) : Math.max(0, 2 - dayCount(PK));
 
-  /* listen first: read, breathe 7–30 seconds (longer for longer confessions), then write */
+  /* listen first: the button warms up while the confession is read, one slow breath, then write */
   let listenTimer = 0;
   function resetListen() {
-    clearInterval(listenTimer);
+    clearInterval(listenTimer); clearTimeout(readTimer);
     const left = repliesLeft();
     $('limit').hidden = left > 0; $('listen').hidden = left <= 0; $('compose').hidden = true;
     $('listenBtn').hidden = false; $('listenLeft').textContent = ''; $('breath').classList.remove('on');
+    if (!$('listen').hidden) startReading();
+  }
+  // Reading time and the breathing pause are one thing: the button warms up while the confession is read (7–30 s by length).
+  // Pressing it opens the reply box straight away, after a single slow breath.
+  let readTimer = 0;
+  function startReading() {
+    clearTimeout(readTimer);
+    const btn = $('listenBtn'), secs = Math.max(7, Math.min(30, 7 + Math.floor($('confText').textContent.length / 50)));
+    btn.disabled = true; btn.classList.add('filling'); btn.style.setProperty('--fill', secs + 's'); btn.textContent = '천천히 읽어요…';
+    $('listenHint').textContent = '천천히 읽어주세요. 다 읽으면 버튼이 따뜻하게 켜져요.';
+    readTimer = setTimeout(() => {
+      btn.disabled = false; btn.classList.remove('filling'); btn.textContent = '다 읽었어요';
+      $('listenHint').textContent = '다 읽으셨나요? 누르면 숨을 한 번 쉬고, 답장을 쓸 수 있어요.';
+    }, secs * 1000);
   }
   $('listenBtn').addEventListener('click', async () => {
     if (live) {
@@ -846,13 +864,10 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
       if (!r.ok) { lost('이 고해는 이미 다음 신부님께 넘어갔어요.'); return; }
       cur.state = 'reading'; cur.deadline = r.data.deadline; liveClock();
     } else stopAssign(true);
-    // the pause scales with the confession: a short note gets a short breath (7s), a long story up to 30s
-    let s = Math.max(7, Math.min(30, 7 + Math.floor($('confText').textContent.length / 50))); $('listenBtn').hidden = true; $('breath').classList.add('on');
-    const tick = () => {
-      $('listenLeft').textContent = s > 0 ? `천천히 숨을 쉬어요 · ${s}초` : '';
-      if (s-- <= 0) { clearInterval(listenTimer); $('listen').hidden = true; $('compose').hidden = false; box.focus(); }
-    };
-    tick(); listenTimer = setInterval(tick, 1000);
+    $('listenBtn').hidden = true; $('breath').classList.add('on');
+    $('listenLeft').textContent = '숨을 한 번, 천천히 쉬어요';
+    clearInterval(listenTimer);
+    listenTimer = setTimeout(() => { $('listenLeft').textContent = ''; $('listen').hidden = true; $('compose').hidden = false; box.focus(); }, reduce ? 400 : 2400);
   });
 
   /* on duty: one confession is assigned; start reading within 5 minutes or it moves on */
