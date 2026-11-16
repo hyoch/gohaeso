@@ -1,0 +1,15 @@
+{
+  "name": "gohaeso",
+  "private": true,
+  "version": "0.1.0",
+  "description": "작은 고해소: AI 디톡스 고해소. 사람만 대답하는 3D 성당 마당.",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}

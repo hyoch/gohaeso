@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "gohaeso",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-06-01",
+  // Static site lives in ./public. Only /ws/* reaches the Worker first; everything else is served as a file.
+  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/ws/*"] },
+  "durable_objects": { "bindings": [{ "name": "ROOM", "class_name": "Room" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
+  // No request logs are collected: this service promises not to keep traces of visitors.
+  "observability": { "enabled": false }
+}
