@@ -154,6 +154,7 @@ button { font: inherit; cursor: pointer; border: 0; border-radius: 999px; paddin
 @keyframes blink { 50% { opacity: 0 } }
 .thinking { font-size: 12.5px; color: var(--muted); min-height: 1.4em; margin: 0 }
 .thinking.pausing { animation: blink 1.4s steps(1) infinite }
+.shareCount { color: var(--muted); margin: -2px 0 8px }
 .gone { text-decoration: line-through; opacity: .4; transition: opacity .35s }
 .trace { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px }
 .chip { font-size: 12.5px; padding: 4px 10px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--muted) 35%, transparent); color: var(--muted); transition: background .25s, color .25s, border-color .25s }
@@ -362,6 +363,7 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
 
   <section class="panel" id="done" hidden>
     <p class="reply" id="reply"></p>
+    <p class="small shareCount" id="shareCount" hidden></p>
     <p class="small keytip" id="keyTip" hidden>🗝 이 기기에 우편함 열쇠가 만들어졌어요. 열쇠를 잃어버리면 저희도 우편함을 찾아드릴 방법이 없어요. 답장이 올 때까지 이 열쇠를 당신만의 비밀 수첩에 꼭 적어두세요. <a href="#privacy">열쇠 보러 가기</a></p>
     <div class="notifyBox" data-live hidden>
       <p class="small notifyMsg" aria-live="polite"></p>
@@ -1540,6 +1542,12 @@ footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 4px }
       : mailLive ? '우체통에 고해를 넣었어요. 이곳의 시간은 바깥보다 조금 느리게 흘러요. 누군가 읽고 손으로 답장을 쓸 때까지 마음 편히 기다려주세요. 답장은 정해진 우편 시간(오전 7시·낮 12시 30분·밤 9시)에 도착하고, 48시간 안에 아무도 답하지 못하면 글은 지워져요.'
       : nDuty ? `당직 신부님${live ? ' 한 분' : ` '${pick(DUTY_SAMPLE)}'`}께 배정됐어요. 지금 성당 창문의 촛불이 깜빡이고 있어요. 답장은 느린 우편으로 내일 아침 우체통에 도착해요.`
       : '편지로 맡겨뒀어요. 48시간 안에 신부님이 답하면 우체통에 조용히 도착해요. 아무도 읽지 못하면 그대로 지워지고, 그 사실도 정직하게 알려드릴게요.';
+    { // only real numbers from the server; never shown in the preview
+      const el = $('shareCount'), t = mailLive && duty && liveRes ? liveRes.today | 0 : 0, all = mailLive && duty && liveRes ? liveRes.total | 0 : 0;
+      el.hidden = !t;
+      if (t) el.textContent = t >= 2 ? `오늘 당신을 포함해 ${t}분이 이곳에 무거운 마음을 두고 갔어요.${all > t ? ` 지금까지는 ${all}분이에요.` : ''}`
+        : all > 1 ? `오늘 이곳에 마음을 두고 간 첫 번째 분이에요. 지금까지 ${all}분이 다녀갔어요.` : '이곳에 마음을 맡긴 첫 번째 분이에요.';
+    }
     $('oneLineBox').hidden = !duty; $('peekRow').hidden = !duty || mailLive;
     if (duty) {
       $('oneLine').textContent = pick(ONE_LINES); $('peekNote').textContent = '';

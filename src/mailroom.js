@@ -300,7 +300,10 @@ export class Mailroom extends DurableObject {
     this.run(`DELETE FROM conf WHERE owner=? AND state IN ('expired','care')`, who);
     this.run('INSERT INTO conf(id, owner, topic, ct, iv, created, state) VALUES(?,?,?,?,?,?,?)', id, who, b.topic, sealed.ct, sealed.iv, now, 'waiting');
     this.bump(who, 'conf', day); this.bump('*', 'conf', day);
-    return ok({ waiting: this.q(`SELECT COUNT(*) c FROM conf WHERE state='waiting'`)[0].c, duty: this.dutyCount(now), expiresAt: now + this.L.WAIT_MS });
+    // an anonymous running count, shown back honestly: how many have left a heavy heart here (no link to any key)
+    this.run(`INSERT INTO kv(k, v) VALUES('total_conf', '1') ON CONFLICT(k) DO UPDATE SET v=CAST(CAST(v AS INTEGER)+1 AS TEXT)`);
+    const total = Number((this.q(`SELECT v FROM kv WHERE k='total_conf'`)[0] || {}).v) || 1;
+    return ok({ today: this.used('*', 'conf', day), total, waiting: this.q(`SELECT COUNT(*) c FROM conf WHERE state='waiting'`)[0].c, duty: this.dutyCount(now), expiresAt: now + this.L.WAIT_MS });
   }
 
   async do_claim(who, b, now) {
