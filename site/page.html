@@ -137,8 +137,19 @@ body.typing { padding-bottom: 45vh }                   /* room to scroll the box
 .calBox { margin: 4px 0 10px } a.calBtn { display: inline-block; text-decoration: none; border-radius: 999px; padding: 6px 12px }
 .calBox .small { margin: 6px 0 0 }
 #footShareMsg:empty, #recruitMsg:empty { display: none }
-.keepPreview { margin: 10px 0 } .keepPreview img { display: block; width: min(100%, 320px); border-radius: 12px; border: 1px solid color-mix(in srgb, var(--muted) 30%, transparent); -webkit-touch-callout: default }
-.keepPreview a { display: inline-block; margin-top: 6px }
+.sheet { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end; justify-content: center }
+.sheet[hidden] { display: none !important }
+.sheetBack { position: absolute; inset: 0; background: rgba(10, 8, 14, .62) }
+.sheetCard { position: relative; width: min(100%, 440px); max-height: 92vh; overflow-y: auto; background: var(--paper); color: var(--ink);
+  border-radius: 22px 22px 0 0; padding: 16px max(16px, env(safe-area-inset-right, 0px)) calc(18px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  display: grid; gap: 12px; animation: sheetUp .28s ease-out }
+@keyframes sheetUp { from { transform: translateY(24px); opacity: 0 } to { transform: none; opacity: 1 } }
+@media (prefers-reduced-motion: reduce) { .sheetCard { animation: none } }
+.sheetCard img { display: block; width: auto; max-width: 100%; max-height: 52vh; margin: 0 auto; border-radius: 14px; box-shadow: 0 8px 30px rgba(0,0,0,.35); -webkit-touch-callout: default }
+.sheetActs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px }
+.sheetActs > * { width: 100%; text-align: center }
+.sheetLink { display: inline-block; text-decoration: none; border-radius: 999px; padding: 11px 20px; font-weight: 600 }
+#keepX { justify-self: center }
 .more { margin: 6px 0 } .more summary { font-size: 12.5px; color: var(--muted); cursor: pointer; padding: 6px 0 }
 .shareCount { color: var(--muted); margin: -2px 0 8px }
 .gone { text-decoration: line-through; opacity: .4; transition: opacity .35s }
@@ -299,10 +310,7 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
       <p class="thinking" id="letterThinking"></p>
       <div class="row"><button class="ghost sm" id="letterReplay" hidden>쓰는 과정 다시 보기</button><button class="ghost sm" id="letterWarm">따뜻했어요 🕯</button><button type="button" class="ghost sm" id="reportLetter">어긋난 마음 알리기</button></div>
       <div class="row"><button type="button" class="ghost sm" id="letterSave">편지 간직하기</button><span class="small" id="saveMsg" aria-live="polite"></span></div>
-      <div class="keepPreview" id="keepPreview" hidden>
-        <img id="keepImg" alt="간직하기 그림: 받은 답장과 쓴 시간이 적힌 편지">
-        <a class="small" id="keepDl" href="#" download="gohaeso-letter.png">파일로 내려받기</a>
-      </div>
+
     </div>
     <label class="hint" for="thanksBox">신부님께 짧은 답례</label>
     <textarea id="thanksBox" class="short" maxlength="200" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
@@ -580,7 +588,21 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
     <p class="confess">먼저 고백할게요. 이 고해소는 AI의 도움으로 지었어요. 그래서 위로만큼은 사람 손에 맡기기로 했어요.</p>
   </section>
 
-  <footer>
+  <div class="sheet" id="keepSheet" hidden>
+  <div class="sheetBack" id="keepBack"></div>
+  <div class="sheetCard" role="dialog" aria-modal="true" aria-labelledby="keepTitle">
+    <div class="row" style="justify-content:space-between"><b id="keepTitle">편지 간직하기</b><button type="button" class="ghost sm" id="keepClose">닫기</button></div>
+    <img id="keepImg" alt="간직하기 그림: 받은 답장과 쓴 시간이 적힌 편지">
+    <div class="sheetActs">
+      <button type="button" class="primary" id="keepShare">공유하기</button>
+      <button type="button" class="ghost" id="keepSave">사진에 저장</button>
+      <a class="ghost sheetLink" id="keepDl" href="#" download="gohaeso-letter.png" hidden>파일로 내려받기</a>
+    </div>
+    <p class="small" id="keepHint"></p>
+    <a class="small" id="keepX" href="#" target="_blank" rel="noopener noreferrer">X에 글로 올리기</a>
+  </div>
+</div>
+<footer>
     <span class="footlinks"><button type="button" class="linkbtn" id="footPrivacy" aria-expanded="false" aria-controls="privacy">개인정보 처리방침 · 이용 수칙</button><button type="button" class="linkbtn" id="footHelp">마음이 힘들다면</button><button type="button" class="linkbtn" id="footShare">고해소 알리기</button><a class="linkbtn" id="footDonate" href="#" target="_blank" rel="noopener noreferrer" hidden>후원하기</a><span>문의 <b>help@gohaeso.space</b></span></span>
     <span class="small" id="footShareMsg" aria-live="polite"></span>
     <span>로그인 없음 · 외부 글꼴과 분석 도구 없음 · 혼자 털어놓은 글은 저장되지 않아요</span>
@@ -1932,7 +1954,7 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
     if (!text || keep.key === key) return;
     keep.key = key; keep.file = null;
     if (keep.url) { URL.revokeObjectURL(keep.url); keep.url = ''; }
-    $('keepPreview').hidden = true; $('saveMsg').textContent = '';
+    $('saveMsg').textContent = '';
     try {
       const blob = await drawKeepsake(text, proof);
       if (blob && keep.key === key) { keep.file = new File([blob], 'gohaeso-letter.png', { type: 'image/png' }); keep.url = URL.createObjectURL(blob); }
@@ -1944,26 +1966,44 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
     const text = (G.mailLive && letterFinal) ? letterFinal : $('letterText').textContent;
     setTimeout(() => prepareKeepsake(text, $('letterProof').textContent), 60);
   }).observe($('letter'), { attributes: true, attributeFilter: ['hidden'] });
-  function showKeepsake(note) {
-    const box = $('keepPreview'); $('keepImg').src = keep.url; $('keepDl').href = keep.url; box.hidden = false;
-    $('saveMsg').textContent = note;
-    box.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest' });
+  /* the sheet: a preview first, then the phone's own share sheet (Instagram, KakaoTalk, Messages, Photos…) */
+  const canShareFile = () => !!(keep.file && navigator.canShare && navigator.canShare({ files: [keep.file] }));
+  let sheetReturn = null;
+  function openSheet() {
+    $('keepImg').src = keep.url; $('keepDl').href = keep.url;
+    const share = canShareFile();
+    $('keepShare').hidden = !share; $('keepSave').hidden = !share; $('keepDl').hidden = share;
+    $('keepHint').textContent = share
+      ? '공유하기에서 인스타그램·카카오톡 등을 고를 수 있어요. 인스타그램에서는 스토리나 게시물을 골라요. 사진에 저장은 공유 창의 "이미지 저장"을 눌러요.'
+      : '그림을 길게 눌러 사진에 저장할 수 있어요. 컴퓨터에서는 파일로 내려받아요.';
+    $('keepX').href = 'https://x.com/intent/post?text=' + encodeURIComponent('사람이 손수 쓴 답장을 받았어요. 🕯') + '&url=' + encodeURIComponent('https://gohaeso.space/');
+    sheetReturn = document.activeElement;
+    $('keepSheet').hidden = false; document.documentElement.style.overflow = 'hidden';
+    $(share ? 'keepShare' : 'keepClose').focus();
   }
+  function closeSheet() {
+    $('keepSheet').hidden = true; document.documentElement.style.overflow = '';
+    if (sheetReturn && sheetReturn.focus) sheetReturn.focus();
+  }
+  $('keepClose').addEventListener('click', closeSheet);
+  $('keepBack').addEventListener('click', closeSheet);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('keepSheet').hidden) closeSheet(); });
+  // straight from the tap: the picture is already drawn, so nothing is awaited before share()
+  async function shareKeep(note) {
+    try { await navigator.share({ files: [keep.file] }); $('saveMsg').textContent = note; closeSheet(); }
+    catch (e) { if (!e || e.name !== 'AbortError') $('keepHint').textContent = '공유 창을 열지 못했어요. 그림을 길게 눌러 저장하거나 공유해주세요.'; }
+  }
+  $('keepShare').addEventListener('click', () => shareKeep('이 기기에서만 만든 그림이에요. 서버에는 남지 않아요.'));
+  $('keepSave').addEventListener('click', () => shareKeep('간직했어요. 그림은 이 기기에서만 만들어졌어요.'));
   $('letterSave').addEventListener('click', async () => {
     const msg = $('saveMsg');
-    if (!keep.file) {                                         // still drawing (rare): show it on the page once ready
+    if (!keep.file) {
       msg.textContent = '그림을 만들고 있어요…';
-      const text = (G.mailLive && letterFinal) ? letterFinal : $('letterText').textContent;
-      keep.key = ''; await prepareKeepsake(text, $('letterProof').textContent);
+      keep.key = ''; await prepareKeepsake((G.mailLive && letterFinal) ? letterFinal : $('letterText').textContent, $('letterProof').textContent);
       if (!keep.file) { msg.textContent = '지금은 그림을 만들지 못했어요. 잠시 뒤 다시 눌러주세요.'; return; }
-      showKeepsake('그림을 길게 눌러 \'사진에 저장\'을 고르면 간직할 수 있어요.'); return;
+      msg.textContent = '';
     }
-    const share = { files: [keep.file] };                     // the picture only: some apps refuse a picture with text
-    if (navigator.canShare && navigator.canShare(share)) {
-      try { await navigator.share(share); msg.textContent = '이 기기에서만 만든 그림이에요. 서버에는 남지 않아요.'; return; }
-      catch (e) { if (e && e.name === 'AbortError') { msg.textContent = ''; return; } }
-    }
-    showKeepsake('그림을 길게 눌러 \'사진에 저장\'을 고르면 간직할 수 있어요. 컴퓨터에서는 아래 \'파일로 내려받기\'를 눌러요.');
+    openSheet();
   });
   /* optional donation link: shown only when the site is built with one */
   (() => {
