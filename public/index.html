@@ -173,6 +173,8 @@ body.typing { padding-bottom: 45vh }                   /* room to scroll the box
 .calBox { margin: 4px 0 10px } a.calBtn { display: inline-block; text-decoration: none; border-radius: 999px; padding: 6px 12px }
 .calBox .small { margin: 6px 0 0 }
 #footShareMsg:empty, #recruitMsg:empty { display: none }
+.keepPreview { margin: 10px 0 } .keepPreview img { display: block; width: min(100%, 320px); border-radius: 12px; border: 1px solid color-mix(in srgb, var(--muted) 30%, transparent); -webkit-touch-callout: default }
+.keepPreview a { display: inline-block; margin-top: 6px }
 .more { margin: 6px 0 } .more summary { font-size: 12.5px; color: var(--muted); cursor: pointer; padding: 6px 0 }
 .shareCount { color: var(--muted); margin: -2px 0 8px }
 .gone { text-decoration: line-through; opacity: .4; transition: opacity .35s }
@@ -333,6 +335,10 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
       <p class="thinking" id="letterThinking"></p>
       <div class="row"><button class="ghost sm" id="letterReplay" hidden>쓰는 과정 다시 보기</button><button class="ghost sm" id="letterWarm">따뜻했어요 🕯</button><button type="button" class="ghost sm" id="reportLetter">어긋난 마음 알리기</button></div>
       <div class="row"><button type="button" class="ghost sm" id="letterSave">편지 간직하기</button><span class="small" id="saveMsg" aria-live="polite"></span></div>
+      <div class="keepPreview" id="keepPreview" hidden>
+        <img id="keepImg" alt="간직하기 그림: 받은 답장과 쓴 시간이 적힌 편지">
+        <a class="small" id="keepDl" href="#" download="gohaeso-letter.png">파일로 내려받기</a>
+      </div>
     </div>
     <label class="hint" for="thanksBox">신부님께 짧은 답례</label>
     <textarea id="thanksBox" class="short" maxlength="200" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
@@ -1932,40 +1938,68 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
   }
   $('letterReplay').addEventListener('click', () => { const my = ++letterTok; G.replay($('letterText'), $('letterThinking'), letterLog, letterFinal, () => my === letterTok); });
   $('letterClose').addEventListener('click', () => { letterTok++; });
-  /* keepsake: the letter becomes a picture made on this device only; nothing is sent anywhere */
-  $('letterSave').addEventListener('click', async () => {
-    const msg = $('saveMsg'), text = $('letterText').textContent, proof = $('letterProof').textContent;
-    if (!text) return;
+  /* keepsake: the letter becomes a picture made on this device only; nothing is sent anywhere.
+     The picture is drawn as soon as the letter opens, so a tap can open the share sheet at once
+     (iPhone allows it only straight from the tap). If sharing is refused, the picture is shown on the page to press and save. */
+  let keep = { key: '', file: null, url: '' };
+  function drawKeepsake(text, proof) {
+    const W = 1080, pad = 96, maxW = W - pad * 2, SERIF = '"Noto Serif KR","Noto Serif CJK KR","Nanum Myeongjo",AppleMyungjo,serif';
+    const size = text.length > 600 ? 32 : text.length > 300 ? 38 : 46, lh = Math.round(size * 1.7);
+    const probe = document.createElement('canvas').getContext('2d');
+    const wrap = (str, font) => { probe.font = font; const out = []; for (const para of str.split('\n')) { let line = ''; for (const ch of para) { if (probe.measureText(line + ch).width > maxW) { out.push(line); line = ch === ' ' ? '' : ch; } else line += ch; } out.push(line); } return out; };
+    const body = wrap(text, `${size}px ${SERIF}`), pr = wrap(proof, `28px ${SERIF}`);
+    const block = 290 + body.length * lh + 50 + pr.length * 44;
+    const H = Math.max(1920, block + 420), top = Math.round((H - block) / 2) - 40;
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+    const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#2d2547'); bg.addColorStop(1, '#16131c'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+    const glow = g.createRadialGradient(W / 2, top + 110, 4, W / 2, top + 110, 150); glow.addColorStop(0, 'rgba(255,200,120,.55)'); glow.addColorStop(1, 'rgba(255,200,120,0)'); g.fillStyle = glow; g.fillRect(0, top - 40, W, 340);
+    g.fillStyle = '#ffb24a'; g.beginPath(); g.ellipse(W / 2, top + 112, 15, 28, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#f1e9de'; g.fillRect(W / 2 - 14, top + 136, 28, 60);
+    g.textAlign = 'center'; g.fillStyle = '#c9bfd8'; g.font = `30px ${SERIF}`; g.fillText('작은 고해소', W / 2, top + 250);
+    g.textAlign = 'left'; g.fillStyle = '#f4eefa'; g.font = `${size}px ${SERIF}`;
+    let y = top + 340; body.forEach(l => { g.fillText(l, pad, y); y += lh; });
+    y += 50; g.fillStyle = '#b9b1c5'; g.font = `28px ${SERIF}`; pr.forEach(l => { g.fillText(l, pad, y); y += 44; });
+    g.textAlign = 'center'; g.fillStyle = '#8f86a0'; g.font = `26px ${SERIF}`;
+    g.fillText(`사람이 손수 쓴 답장 · ${new Date().toLocaleDateString('ko-KR')} · gohaeso.space`, W / 2, H - 110);
+    return new Promise(r => c.toBlob(r, 'image/png'));
+  }
+  async function prepareKeepsake(text, proof) {
+    const key = text + '\u0000' + proof;
+    if (!text || keep.key === key) return;
+    keep.key = key; keep.file = null;
+    if (keep.url) { URL.revokeObjectURL(keep.url); keep.url = ''; }
+    $('keepPreview').hidden = true; $('saveMsg').textContent = '';
     try {
-      const W = 1080, pad = 96, maxW = W - pad * 2, SERIF = '"Noto Serif KR","Noto Serif CJK KR","Nanum Myeongjo",AppleMyungjo,serif';
-      const size = text.length > 600 ? 32 : text.length > 300 ? 38 : 46, lh = Math.round(size * 1.7);
-      const probe = document.createElement('canvas').getContext('2d');
-      const wrap = (str, font) => { probe.font = font; const out = []; for (const para of str.split('\n')) { let line = ''; for (const ch of para) { if (probe.measureText(line + ch).width > maxW) { out.push(line); line = ch === ' ' ? '' : ch; } else line += ch; } out.push(line); } return out; };
-      const body = wrap(text, `${size}px ${SERIF}`), pr = wrap(proof, `28px ${SERIF}`);
-      const block = 290 + body.length * lh + 50 + pr.length * 44;                 // candle + title + letter + proof
-      const H = Math.max(1920, block + 420), top = Math.round((H - block) / 2) - 40;  // 9:16 for stories, letter centred
-      const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
-      const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#2d2547'); bg.addColorStop(1, '#16131c'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
-      const glow = g.createRadialGradient(W / 2, top + 110, 4, W / 2, top + 110, 150); glow.addColorStop(0, 'rgba(255,200,120,.55)'); glow.addColorStop(1, 'rgba(255,200,120,0)'); g.fillStyle = glow; g.fillRect(0, top - 40, W, 340);
-      g.fillStyle = '#ffb24a'; g.beginPath(); g.ellipse(W / 2, top + 112, 15, 28, 0, 0, Math.PI * 2); g.fill();
-      g.fillStyle = '#f1e9de'; g.fillRect(W / 2 - 14, top + 136, 28, 60);
-      g.textAlign = 'center'; g.fillStyle = '#c9bfd8'; g.font = `30px ${SERIF}`; g.fillText('작은 고해소', W / 2, top + 250);
-      g.textAlign = 'left'; g.fillStyle = '#f4eefa'; g.font = `${size}px ${SERIF}`;
-      let y = top + 340; body.forEach(l => { g.fillText(l, pad, y); y += lh; });
-      y += 50; g.fillStyle = '#b9b1c5'; g.font = `28px ${SERIF}`; pr.forEach(l => { g.fillText(l, pad, y); y += 44; });
-      g.textAlign = 'center'; g.fillStyle = '#8f86a0'; g.font = `26px ${SERIF}`;
-      g.fillText(`사람이 손수 쓴 답장 · ${new Date().toLocaleDateString('ko-KR')} · gohaeso.space`, W / 2, H - 110);
-      const blob = await new Promise(r => c.toBlob(r, 'image/png'));
-      if (!blob) throw new Error('blob');
-      const file = new File([blob], 'gohaeso-letter.png', { type: 'image/png' });
-      const share = { files: [file], text: '사람이 손수 쓴 답장 · https://gohaeso.space' };
-      if (navigator.canShare && navigator.canShare(share)) {
-        try { await navigator.share(share); msg.textContent = '이 기기에서만 만든 그림이에요. 서버에는 남지 않아요.'; return; } catch (e) { if (e && e.name === 'AbortError') return; }
-      }
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'gohaeso-letter.png'; document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-      msg.textContent = '그림으로 저장했어요. 이 기기에서만 만들어져 서버에는 남지 않아요.';
-    } catch (e) { msg.textContent = '지금은 저장하지 못했어요. 잠시 뒤 다시 눌러주세요.'; }
+      const blob = await drawKeepsake(text, proof);
+      if (blob && keep.key === key) { keep.file = new File([blob], 'gohaeso-letter.png', { type: 'image/png' }); keep.url = URL.createObjectURL(blob); }
+    } catch (e) { keep.key = ''; }
+  }
+  // draw as soon as a letter is shown (live or preview), always from the full text, never from a replay in progress
+  new MutationObserver(() => {
+    if ($('letter').hidden) return;
+    const text = (G.mailLive && letterFinal) ? letterFinal : $('letterText').textContent;
+    setTimeout(() => prepareKeepsake(text, $('letterProof').textContent), 60);
+  }).observe($('letter'), { attributes: true, attributeFilter: ['hidden'] });
+  function showKeepsake(note) {
+    const box = $('keepPreview'); $('keepImg').src = keep.url; $('keepDl').href = keep.url; box.hidden = false;
+    $('saveMsg').textContent = note;
+    box.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest' });
+  }
+  $('letterSave').addEventListener('click', async () => {
+    const msg = $('saveMsg');
+    if (!keep.file) {                                         // still drawing (rare): show it on the page once ready
+      msg.textContent = '그림을 만들고 있어요…';
+      const text = (G.mailLive && letterFinal) ? letterFinal : $('letterText').textContent;
+      keep.key = ''; await prepareKeepsake(text, $('letterProof').textContent);
+      if (!keep.file) { msg.textContent = '지금은 그림을 만들지 못했어요. 잠시 뒤 다시 눌러주세요.'; return; }
+      showKeepsake('그림을 길게 눌러 \'사진에 저장\'을 고르면 간직할 수 있어요.'); return;
+    }
+    const share = { files: [keep.file] };                     // the picture only: some apps refuse a picture with text
+    if (navigator.canShare && navigator.canShare(share)) {
+      try { await navigator.share(share); msg.textContent = '이 기기에서만 만든 그림이에요. 서버에는 남지 않아요.'; return; }
+      catch (e) { if (e && e.name === 'AbortError') { msg.textContent = ''; return; } }
+    }
+    showKeepsake('그림을 길게 눌러 \'사진에 저장\'을 고르면 간직할 수 있어요. 컴퓨터에서는 아래 \'파일로 내려받기\'를 눌러요.');
   });
   /* optional donation link: shown only when the site is built with one */
   (() => {
