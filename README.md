@@ -59,6 +59,7 @@ Cloudflare 대시보드 → Workers & Pages → Create → Import a repository �
 - 하루 60통 선착순, 한 사람 하루 1통, 답장 3통, 넘기기 2번.
 - 답장은 `[시각, 위치, 지운 수, 넣은 글, 조합여부]` 기록과 함께 와야 하고, 서버가 기록으로 글을 그대로 재현해 보고 글자당 30ms보다 빠르거나 한 번에 12자(조합 24자)를 넘게 넣은 기록은 거부한다. 쓴 시간·고친 횟수·멈춤 횟수는 서버가 계산한다.
 - 고해에는 위기 단어·전화번호·이메일·링크가 있으면 저장하지 않고 거부한다. 답장과 답례에는 연락처 유도 말도 거부한다.
+- 운영실: `/admin.html`에서 `ADMIN_TOKEN`으로 연다. 지금 상태와 최근 14일 합계(`GET /api/admin/stats`, 날짜·종류·개수만 저장하는 `daily` 표, 90일 보관)와 신고 처리를 본다. 방문자 수는 세지 않는다(Cloudflare Analytics 사용).
 - 신고는 신고한 한 건만 운영자가 볼 수 있다 (`GET /api/admin/reports`, `ADMIN_TOKEN`). 신고한 상대는 자동 차단. 서로 다른 3명에게 답장이 신고된 사람은 새 고해를 받을 수 없다. 위기 신고(`care`)는 내용을 바로 지우고 보낸 사람에게 도움 안내를 띄운다.
 
 **비밀값 설정 (Cloudflare 대시보드 → Workers & Pages → gohaeso → Settings → Variables and Secrets, 타입 Secret)**

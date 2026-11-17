@@ -104,6 +104,7 @@ const ROUTES = {
   'POST /api/push': ['push', 2048, true],
   'POST /api/unpush': ['unpush', 1024, true],
   'GET /api/admin/reports': ['admin_reports', 0, true],
+  'GET /api/admin/stats': ['admin_stats', 0, true],
   'POST /api/admin/resolve': ['admin_resolve', 1024, true]
 };
 const JSON_HEADERS = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' };

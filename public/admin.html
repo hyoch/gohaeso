@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>운영실 · 작은 고해소</title>
+<style>
+:root { --bg: #16131c; --card: #211c2b; --ink: #f1ecf7; --muted: #b9b1c5; --line: #3a3248; --flame: #ffb24a; --warn: #ff8a7a; color-scheme: dark }
+* { box-sizing: border-box }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 48px max(16px, env(safe-area-inset-left)) }
+main { max-width: 760px; margin: 0 auto; display: grid; gap: 16px }
+h1 { font-size: 20px; margin: 4px 0 0 } h2 { font-size: 15px; margin: 0 0 10px; color: var(--muted); font-weight: 600 }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px }
+.small { font-size: 13px; color: var(--muted) }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px }
+.num { background: #1b1724; border-radius: 10px; padding: 10px 12px }
+.num b { display: block; font-size: 24px; font-variant-numeric: tabular-nums; line-height: 1.2 }
+.num span { font-size: 12.5px; color: var(--muted) }
+.num.alert b { color: var(--warn) }
+.wrap { overflow-x: auto }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: 13.5px; white-space: nowrap }
+th, td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--line) }
+th:first-child, td:first-child { text-align: left } th { color: var(--muted); font-weight: 500 }
+tr.today td { color: var(--flame) }
+input { width: 100%; font: inherit; color: var(--ink); background: #1b1724; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px }
+button { font: inherit; color: var(--ink); background: #3a3248; border: 0; border-radius: 999px; padding: 8px 14px; cursor: pointer }
+button.danger { background: #5a2b2b } button:disabled { opacity: .5 }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center }
+.rep { border-top: 1px solid var(--line); padding: 12px 0 } .rep:first-child { border-top: 0; padding-top: 0 }
+.rep p { margin: 6px 0; white-space: pre-wrap; word-break: break-word; min-width: 0 }
+.tag { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #3a3248; color: var(--ink) }
+</style>
+</head>
+<body>
+<main>
+  <h1>운영실</h1>
+  <p class="small">합계 숫자만 보여요. 누가 무엇을 썼는지는 신고된 글 말고는 여기에도 나오지 않아요.</p>
+
+  <section class="card" id="login">
+    <h2>운영자 토큰</h2>
+    <form id="loginForm" class="row">
+      <input id="token" type="password" autocomplete="off" spellcheck="false" placeholder="ADMIN_TOKEN">
+      <button type="submit">열기</button>
+    </form>
+    <p class="small" id="loginMsg">토큰은 이 탭이 닫히면 잊혀요.</p>
+  </section>
+
+  <div id="board" hidden>
+    <section class="card">
+      <div class="row" style="justify-content:space-between"><h2 style="margin:0">지금</h2><span class="small" id="stamp"></span></div>
+      <div class="grid" id="nowGrid" style="margin-top:10px"></div>
+    </section>
+    <section class="card">
+      <h2>최근 14일</h2>
+      <div class="wrap"><table id="days"></table></div>
+      <p class="small">답장한 사람은 그날 답장을 한 번 이상 보낸 우편함 수예요. 이 숫자는 오늘 배포 이후부터 쌓여요.</p>
+    </section>
+    <section class="card">
+      <h2>신고</h2>
+      <div id="reports"></div>
+    </section>
+    <section class="card small">
+      방문자 수는 이 서비스가 세지 않아요. Cloudflare 대시보드의 gohaeso.space → Analytics에서 볼 수 있어요.
+    </section>
+    <div class="row"><button type="button" id="refresh">새로 고침</button><button type="button" id="logout">토큰 지우기</button></div>
+  </div>
+</main>
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const store = { get: () => { try { return sessionStorage.getItem('gohaeso.admin') || ''; } catch (e) { return ''; } },
+                  set: v => { try { v ? sessionStorage.setItem('gohaeso.admin', v) : sessionStorage.removeItem('gohaeso.admin'); } catch (e) {} } };
+  let token = store.get();
+  const api = async (path, body) => {
+    const r = await fetch(path, { method: body ? 'POST' : 'GET', headers: Object.assign({ Authorization: 'Bearer ' + token }, body ? { 'Content-Type': 'application/json' } : {}),
+      body: body ? JSON.stringify(body) : undefined, cache: 'no-store', credentials: 'omit' });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { const e = new Error(d.error || String(r.status)); e.status = r.status; throw e; }
+    return d;
+  };
+  const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+  const mins = ms => ms == null ? '—' : ms < 3600e3 ? Math.round(ms / 60e3) + '분' : (ms / 3600e3).toFixed(1) + '시간';
+  const when = t => new Date(t).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const REASON = { care: '위기', contact: '연락처', sexual: '성적인 내용', attack: '공격', minor: '미성년 의심', ai: 'AI 같음', hurt: '상처 주는 말', preach: '훈계', other: '기타' };
+
+  function paintNow(d) {
+    const n = d.now, g = $('nowGrid'); g.textContent = '';
+    const items = [
+      ['당직 신부님', n.duty], ['기다리는 고해', n.waiting], ['읽고 쓰는 중', n.inHand], ['배달 기다리는 답장', n.toDeliver],
+      ['도착했지만 안 읽힌 답장', n.unread], ['알림 켠 우편함', n.pushSubs], ['처리 안 된 신고', n.openReports, n.openReports > 0],
+      ['누적 고해', n.totalConf], ['7일 평균 답장까지', mins(d.replyWait7d.avgMs) + (d.replyWait7d.n ? ` (${d.replyWait7d.n}건)` : '')]
+    ];
+    for (const [label, v, alert] of items) { const b = el('div', 'num' + (alert ? ' alert' : '')); b.append(el('b', null, String(v)), el('span', null, label)); g.append(b); }
+    $('stamp').textContent = when(d.at) + ' 기준 · 하루 한도 ' + n.dayCap + '건';
+  }
+  function paintDays(d) {
+    const t = $('days'); t.textContent = '';
+    const cols = [['conf', '고해'], ['reply', '답장'], ['repliers', '답장한 사람'], ['pass', '넘김'], ['expired', '만료'], ['warm', '따뜻했어요'], ['thanks', '답례'], ['report', '신고'], ['care', '위기']];
+    const head = el('tr'); head.append(el('th', null, '날짜')); cols.forEach(([, l]) => head.append(el('th', null, l))); t.append(head);
+    const today = d.days[d.days.length - 1].day;
+    for (const row of d.days.slice().reverse()) {
+      const tr = el('tr', row.day === today ? 'today' : ''); tr.append(el('td', null, row.day.slice(5).replace('-', '/')));
+      cols.forEach(([k]) => tr.append(el('td', null, String(row[k] || 0)))); t.append(tr);
+    }
+  }
+  function paintReports(list) {
+    const box = $('reports'); box.textContent = '';
+    if (!list.length) { box.append(el('p', 'small', '처리할 신고가 없어요.')); return; }
+    for (const r of list) {
+      const item = el('div', 'rep');
+      const top = el('div', 'row');
+      top.append(el('span', 'tag', r.kind === 'conf' ? '고해' : '답장'), el('span', 'tag', REASON[r.reason] || r.reason), el('span', 'small', when(r.at)));
+      item.append(top, el('p', null, r.text == null ? '(내용이 이미 지워졌어요)' : r.text));
+      if (r.stats) item.append(el('p', 'small', `${mins(r.stats.active)} 동안 · ${r.stats.fixes}번 고침 · ${r.stats.pauses}번 멈춤 · 다른 화면 ${r.stats.blurs || 0}번`));
+      const act = el('div', 'row'), del = el('button', 'danger', '글 지우기'), keep = el('button', null, '그대로 두고 신고 닫기');
+      let armed = false;
+      del.addEventListener('click', async () => {
+        if (!armed) { armed = true; del.textContent = '한 번 더 누르면 지워요'; setTimeout(() => { armed = false; del.textContent = '글 지우기'; }, 4000); return; }
+        await resolve(r.id, 'delete', item, [del, keep]);
+      });
+      keep.addEventListener('click', () => resolve(r.id, 'keep', item, [del, keep]));
+      act.append(del, keep); item.append(act); box.append(item);
+    }
+  }
+  async function resolve(id, action, item, btns) {
+    btns.forEach(b => { b.disabled = true; });
+    try { await api('/api/admin/resolve', { id, action }); item.remove(); load(); }
+    catch (e) { btns.forEach(b => { b.disabled = false; }); item.append(el('p', 'small', '처리하지 못했어요. 다시 눌러주세요.')); }
+  }
+  async function load() {
+    try {
+      const [s, r] = await Promise.all([api('/api/admin/stats'), api('/api/admin/reports')]);
+      $('login').hidden = true; $('board').hidden = false;
+      paintNow(s); paintDays(s); paintReports(r.reports || []);
+    } catch (e) {
+      $('board').hidden = true; $('login').hidden = false;
+      $('loginMsg').textContent = e.status === 401 ? '토큰이 맞지 않아요.' : e.status === 404 ? '서버에 ADMIN_TOKEN이 설정되지 않았어요.' : '불러오지 못했어요. 잠시 뒤 다시 시도해주세요.';
+      if (e.status === 401) { token = ''; store.set(''); }
+    }
+  }
+  $('loginForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const v = $('token').value.trim();
+    if (!/^[A-Za-z0-9_-]{24,128}$/.test(v)) { $('loginMsg').textContent = '토큰 형식이 아니에요 (영문·숫자·-·_ 24자 이상).'; return; }
+    token = v; store.set(v); $('token').value = ''; load();
+  });
+  $('refresh').addEventListener('click', load);
+  $('logout').addEventListener('click', () => { token = ''; store.set(''); $('board').hidden = true; $('login').hidden = false; $('loginMsg').textContent = '토큰을 지웠어요.'; });
+  if (token) load();
+})();
+</script>
+</body>
+</html>

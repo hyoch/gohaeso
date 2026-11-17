@@ -54,6 +54,8 @@ export class Mailroom extends DurableObject {
     s('CREATE TABLE IF NOT EXISTS push(who TEXT PRIMARY KEY, ct BLOB NOT NULL, iv BLOB NOT NULL, created INTEGER NOT NULL)');
     s('CREATE TABLE IF NOT EXISTS vapid(id INTEGER PRIMARY KEY CHECK(id=1), pub TEXT NOT NULL, ct BLOB NOT NULL, iv BLOB NOT NULL)');
     s('CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT NOT NULL)');
+    // daily totals for the operator: a date, a kind of event and a count. Nothing that points to anyone.
+    s('CREATE TABLE IF NOT EXISTS daily(day TEXT NOT NULL, kind TEXT NOT NULL, n INTEGER NOT NULL, PRIMARY KEY(day, kind))');
     try { s('ALTER TABLE reply ADD COLUMN notified INTEGER NOT NULL DEFAULT 0'); } catch {}
     s(`CREATE TABLE IF NOT EXISTS report(id TEXT PRIMARY KEY, kind TEXT NOT NULL, conf_id TEXT NOT NULL, target TEXT NOT NULL,
        reason TEXT NOT NULL, by TEXT NOT NULL, created INTEGER NOT NULL)`);
@@ -70,6 +72,7 @@ export class Mailroom extends DurableObject {
   }
   used(who, kind, day) { const r = this.q('SELECT n FROM usage WHERE who=? AND day=? AND kind=?', who, day, kind)[0]; return r ? r.n : 0; }
   bump(who, kind, day) { this.run('INSERT INTO usage(who,day,kind,n) VALUES(?,?,?,1) ON CONFLICT(who,day,kind) DO UPDATE SET n=n+1', who, day, kind); }
+  tally(kind, n = 1, now = Date.now()) { if (n > 0) this.run('INSERT INTO daily(day,kind,n) VALUES(?,?,?) ON CONFLICT(day,kind) DO UPDATE SET n=n+?', kstDay(now), kind, n, n); }
   dutyCount(now) { return this.q('SELECT COUNT(*) c FROM duty WHERE seen>?', now - this.L.DUTY_TTL_MS)[0].c; }
   restricted(who, now) {
     return this.q("SELECT COUNT(DISTINCT by) c FROM report WHERE target=? AND kind='reply' AND created>?", who, now - this.L.REPORT_KEEP_MS)[0].c >= this.L.RESTRICT_REPORTS;
@@ -81,7 +84,7 @@ export class Mailroom extends DurableObject {
       if (name === 'health') return ok({ ok: Vault.valid(this.env.MASTER_KEY), duty: this.dutyCount(Date.now()) });
       if (!Vault.valid(this.env.MASTER_KEY)) return err(503, 'not_configured');
       const now = Date.now();
-      if (name === 'admin_reports' || name === 'admin_resolve') return await this.admin(name, key, body || {}, now);
+      if (name === 'admin_reports' || name === 'admin_resolve' || name === 'admin_stats') return await this.admin(name, key, body || {}, now);
       if (!OPS.has(name)) return err(404, 'unknown');
       if (typeof key !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(key)) return err(401, 'no_key');
       const [ipTag, who] = await Promise.all([this.vault.tag('ip', ip || ''), this.vault.tag('who', key)]);
@@ -104,6 +107,7 @@ export class Mailroom extends DurableObject {
       this.run(`UPDATE conf SET state='waiting', holder=NULL, assigned=NULL, started=NULL WHERE id=?`, r.id);
     }
     // nobody answered in 48 hours: the text is erased, a notice remains so the confessor is told honestly
+    this.tally('expired', this.q(`SELECT COUNT(*) c FROM conf WHERE state IN ${OPEN} AND created<?`, now - this.L.WAIT_MS)[0].c, now);
     this.run(`UPDATE conf SET state='expired', ct=x'', iv=x'', holder=NULL, ended=? WHERE state IN ${OPEN} AND created<?`, now, now - this.L.WAIT_MS);
     this.run(`DELETE FROM conf WHERE state IN ('expired','care') AND ended<?`, now - this.L.TOMB_MS);
     this.run(`DELETE FROM conf WHERE state='reported' AND ended<?`, now - this.L.REPORT_KEEP_MS);
@@ -120,6 +124,7 @@ export class Mailroom extends DurableObject {
     this.run('DELETE FROM report WHERE created<?', now - this.L.REPORT_KEEP_MS);
     this.run('DELETE FROM block WHERE at<?', now - 60 * 864e5);
     this.run('DELETE FROM usage WHERE day<?', kstDay(now - 3 * 864e5));
+    this.run('DELETE FROM daily WHERE day<?', kstDay(now - 90 * 864e5));
   }
 
   async arm() {
@@ -299,7 +304,7 @@ export class Mailroom extends DurableObject {
     e = gate(); if (e) return e;                                   // state may have changed while sealing
     this.run(`DELETE FROM conf WHERE owner=? AND state IN ('expired','care')`, who);
     this.run('INSERT INTO conf(id, owner, topic, ct, iv, created, state) VALUES(?,?,?,?,?,?,?)', id, who, b.topic, sealed.ct, sealed.iv, now, 'waiting');
-    this.bump(who, 'conf', day); this.bump('*', 'conf', day);
+    this.bump(who, 'conf', day); this.bump('*', 'conf', day); this.tally('conf', 1, now);
     // an anonymous running count, shown back honestly: how many have left a heavy heart here (no link to any key)
     this.run(`INSERT INTO kv(k, v) VALUES('total_conf', '1') ON CONFLICT(k) DO UPDATE SET v=CAST(CAST(v AS INTEGER)+1 AS TEXT)`);
     const total = Number((this.q(`SELECT v FROM kv WHERE k='total_conf'`)[0] || {}).v) || 1;
@@ -338,7 +343,7 @@ export class Mailroom extends DurableObject {
     if (this.used(who, 'pass', day) >= this.L.PASSES_PER_DAY) return err(429, 'limit');
     this.run('INSERT OR IGNORE INTO passed(conf_id, who) VALUES(?,?)', h.id, who);
     this.run(`UPDATE conf SET state='waiting', holder=NULL, assigned=NULL, started=NULL WHERE id=?`, h.id);
-    this.bump(who, 'pass', day);
+    this.bump(who, 'pass', day); this.tally('pass', 1, now);
     return ok({ passesLeft: Math.max(0, this.L.PASSES_PER_DAY - this.used(who, 'pass', day)) });
   }
 
@@ -361,7 +366,8 @@ export class Mailroom extends DurableObject {
     this.run('INSERT INTO reply(conf_id, ct, iv, tct, tiv, stats, created, deliver, author) VALUES(?,?,?,?,?,?,?,?,?)',
       id, a.ct, a.iv, t.ct, t.iv, JSON.stringify(stats), now, deliver, who);
     this.run(`UPDATE conf SET state='answered', holder=NULL, assigned=NULL, started=NULL WHERE id=?`, id);
-    this.bump(who, 'reply', day);
+    this.bump(who, 'reply', day); this.tally('reply', 1, now);
+    if (this.used(who, 'reply', day) === 1) this.tally('repliers', 1, now);   // first reply today from this mailbox
     return ok({ deliverAt: deliver, repliesLeft: Math.max(0, this.L.REPLIES_PER_DAY - this.used(who, 'reply', day)), stats });
   }
 
@@ -385,6 +391,7 @@ export class Mailroom extends DurableObject {
     const c = this.q(`SELECT id FROM conf WHERE owner=? AND state='answered' ORDER BY created DESC LIMIT 1`, who)[0];
     const r = c && this.q('SELECT read_at, hidden FROM reply WHERE conf_id=?', c.id)[0];
     if (!r || r.hidden || !r.read_at) return err(409, 'not_read');
+    if (!this.q('SELECT warm FROM reply WHERE conf_id=?', c.id)[0].warm) this.tally('warm', 1, now);
     this.run('UPDATE reply SET warm=1 WHERE conf_id=?', c.id);
     return ok({ warm: true });
   }
@@ -400,6 +407,7 @@ export class Mailroom extends DurableObject {
     const s = await this.vault.seal(text, 'thanks:' + c.id);
     if (this.q('SELECT 1 FROM thanks WHERE conf_id=?', c.id).length) return err(409, 'already');
     this.run('INSERT INTO thanks(conf_id, ct, iv, created) VALUES(?,?,?,?)', c.id, s.ct, s.iv, now);
+    this.tally('thanks', 1, now);
     return ok({ thanked: true });
   }
 
@@ -412,6 +420,7 @@ export class Mailroom extends DurableObject {
     if (!t) return err(409, 'lost');
     this.run('INSERT INTO report(id, kind, conf_id, target, reason, by, created) VALUES(?,?,?,?,?,?,?)', rid(), kind, t.confId, t.other, b.reason, who, now);
     this.run('INSERT OR REPLACE INTO block(who, other, at) VALUES(?,?,?)', who, t.other, now);
+    this.tally(kind === 'conf' && b.reason === 'care' ? 'care' : 'report', 1, now);
     if (kind === 'conf') {
       if (b.reason === 'care') this.run(`UPDATE conf SET state='care', ct=x'', iv=x'', holder=NULL, assigned=NULL, started=NULL, ended=? WHERE id=?`, now, t.confId);
       else this.run(`UPDATE conf SET state='reported', holder=NULL, assigned=NULL, started=NULL, ended=? WHERE id=?`, now, t.confId);
@@ -468,6 +477,32 @@ export class Mailroom extends DurableObject {
       }
       this.run('DELETE FROM report WHERE id=?', r.id);
       return ok({ done: true });
+    }
+    if (name === 'admin_stats') {
+      const one = (sql, ...a) => (this.q(sql, ...a)[0] || {}).c | 0;
+      const days = [];
+      for (let i = 13; i >= 0; i--) days.push(kstDay(now - i * 864e5));
+      const rows = {};
+      for (const r of this.q('SELECT day, kind, n FROM daily WHERE day>=?', days[0])) (rows[r.day] = rows[r.day] || {})[r.kind] = r.n;
+      const wait = this.q(`SELECT AVG(r.created - c.created) a, COUNT(*) c FROM reply r JOIN conf c ON c.id=r.conf_id WHERE r.created>?`, now - 7 * 864e5)[0] || {};
+      const st = {};
+      for (const r of this.q('SELECT state, COUNT(*) c FROM conf GROUP BY state')) st[r.state] = r.c;
+      return ok({
+        at: now,
+        now: {
+          duty: this.dutyCount(now),
+          waiting: st.waiting | 0,
+          inHand: (st.assigned | 0) + (st.reading | 0),
+          toDeliver: one('SELECT COUNT(*) c FROM reply WHERE hidden=0 AND deliver>?', now),
+          unread: one('SELECT COUNT(*) c FROM reply WHERE hidden=0 AND deliver<=? AND read_at IS NULL', now),
+          pushSubs: one('SELECT COUNT(*) c FROM push'),
+          openReports: one('SELECT COUNT(*) c FROM report'),
+          totalConf: Number((this.q(`SELECT v FROM kv WHERE k='total_conf'`)[0] || {}).v) || 0,
+          dayCap: this.L.DAY_CAP
+        },
+        replyWait7d: { avgMs: wait.c ? Math.round(wait.a) : null, n: wait.c | 0 },
+        days: days.map(d => ({ day: d, ...(rows[d] || {}) }))
+      });
     }
     const out = [];
     for (const r of this.q('SELECT * FROM report ORDER BY created DESC LIMIT 50')) {
