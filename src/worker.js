@@ -112,6 +112,38 @@ const reply = (status, data) => new Response(JSON.stringify(data), { status, hea
 // The health check is shown as plain text so a phone browser displays it instead of downloading it.
 const plain = data => new Response(JSON.stringify(data), { headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
 
+// A calendar reminder to visit the post box. It holds a time and the site address only: no key, no letter, nothing stored.
+const POST_SLOTS = [[7, 0], [12, 30], [21, 0]];
+function remindIcs(request, url) {
+  if (request.method !== 'GET' && request.method !== 'HEAD') return reply(405, { error: 'not_found' });
+  const at = Number(url.searchParams.get('at')), now = Date.now();
+  const k = new Date(at + 9 * 3600e3);
+  const isSlot = Number.isSafeInteger(at) && k.getUTCSeconds() === 0 && k.getUTCMilliseconds() === 0 &&
+    POST_SLOTS.some(([h, m]) => k.getUTCHours() === h && k.getUTCMinutes() === m);
+  if (!isSlot || at < now - 3600e3 || at > now + 4 * 864e5) return reply(400, { error: 'bad_time' });
+  const stamp = t => new Date(t).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const esc = s => s.replace(/[\;,]/g, m => '\\' + m).replace(/\n/g, '\\n');
+  const enc = new TextEncoder();
+  const fold = line => {                     // RFC 5545: at most 75 octets per line, never splitting a character
+    const out = []; let cur = '', n = 0;
+    for (const ch of line) { const b = enc.encode(ch).length; if (n + b > (out.length ? 74 : 75)) { out.push(cur); cur = ''; n = 0; } cur += ch; n += b; }
+    out.push(cur); return out.join('\r\n ');
+  };
+  const site = `https://${url.host}/`;
+  const lines = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//gohaeso//remind//KO', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+    'BEGIN:VEVENT', `UID:${crypto.randomUUID()}@${url.host}`, `DTSTAMP:${stamp(now)}`, `DTSTART:${stamp(at)}`, `DTEND:${stamp(at + 15 * 60e3)}`,
+    `SUMMARY:${esc('작은 고해소 우체통 들르기')}`,
+    `DESCRIPTION:${esc('답장이 도착했을 수 있어요. 고해를 맡긴 그 브라우저로 열어주세요.\n아직 오지 않았다면 다음 우편 시간(아침 7시·낮 12시 30분·밤 9시)에 다시 들러주세요.\n' + site)}`,
+    `URL:${site}`,
+    'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${esc('우체통에 들를 시간이에요')}`, 'TRIGGER:PT0M', 'END:VALARM',
+    'END:VEVENT', 'END:VCALENDAR'
+  ];
+  return new Response(lines.map(fold).join('\r\n') + '\r\n', { headers: {
+    'content-type': 'text/calendar; charset=utf-8', 'content-disposition': 'attachment; filename="gohaeso-mailbox.ics"',
+    'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
+}
+
 async function api(request, env, url) {
   const route = ROUTES[`${request.method} ${url.pathname}`];
   if (!route) return reply(url.pathname.startsWith('/api/') && Object.keys(ROUTES).some(k => k.endsWith(' ' + url.pathname)) ? 405 : 404, { error: 'not_found' });
@@ -155,6 +187,7 @@ export default {
     if (canon && url.host !== canon && url.hostname.endsWith('.workers.dev')) {
       return Response.redirect(`https://${canon}${url.pathname}${url.search}`, request.method === 'GET' || request.method === 'HEAD' ? 301 : 308);
     }
+    if (url.pathname === '/api/remind.ics') return remindIcs(request, url);
     if (url.pathname.startsWith('/api/')) return api(request, env, url);
     const m = url.pathname.match(/^\/ws\/(lobby|yard-[1-9][0-9]?)$/);
     if (m) {

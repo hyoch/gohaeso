@@ -21,6 +21,10 @@ const { chromium } = require('playwright');
   await A.p.click('#send');
   await A.p.waitForSelector('#done:not([hidden])', { timeout: 15000 });
   ok('A: done view says it was handed in (not a fake assignment)', /우체통에 고해를 넣었어요/.test(await txt(A, 'reply')), await txt(A, 'reply'));
+  { const cal = await A.p.evaluate(() => ({ shown: !document.getElementById('calBox').hidden, href: document.getElementById('calBtn').getAttribute('href') }));
+    ok('A: calendar reminder offered with a post-time link', cal.shown && /^\/api\/remind\.ics\?at=\d{13}$/.test(cal.href), cal);
+    const r = await A.p.evaluate(async h => { const x = await fetch(h); return [x.status, x.headers.get('content-type'), (await x.text()).includes('BEGIN:VEVENT')]; }, cal.href);
+    ok('A: calendar link returns an event', r[0] === 200 && /text\/calendar/.test(r[1]) && r[2], r); }
   ok('A: live proof sentence shown, no preview wording', /암호화되어 서버에/.test(await txt(A, 'proofDuty')));
   ok('A: peek-mail button is gone (money/clicks cannot speed up mail)', !(await vis(A, 'peekRow')));
   await A.p.waitForTimeout(1500);

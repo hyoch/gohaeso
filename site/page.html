@@ -134,6 +134,8 @@ button { font: inherit; cursor: pointer; border: 0; border-radius: 999px; paddin
 #replyView > * { transition: opacity .5s ease }
 #replyView.focus > :not(.keep):not(#compose):not(:hover):not(:focus-within) { opacity: .25 }
 body.typing { padding-bottom: 45vh }                   /* room to scroll the box above the keyboard */
+.calBox { margin: 4px 0 10px } a.calBtn { display: inline-block; text-decoration: none; border-radius: 999px; padding: 6px 12px }
+.calBox .small { margin: 6px 0 0 }
 .more { margin: 6px 0 } .more summary { font-size: 12.5px; color: var(--muted); cursor: pointer; padding: 6px 0 }
 .shareCount { color: var(--muted); margin: -2px 0 8px }
 .gone { text-decoration: line-through; opacity: .4; transition: opacity .35s }
@@ -363,6 +365,10 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
     <div class="notifyBox" data-live hidden>
       <p class="small notifyMsg" aria-live="polite"></p>
       <button type="button" class="ghost sm notifyBtn" hidden>편지 오면 알려주세요 🔔</button>
+    </div>
+    <div class="calBox" id="calBox" hidden>
+      <a class="ghost sm calBtn" id="calBtn" href="/api/remind.ics">캘린더에 우체통 들르기 넣기 📅</a>
+      <p class="small" id="calNote"></p>
     </div>
     <details class="more">
       <summary>저장과 개인정보 자세히</summary>
@@ -1574,6 +1580,19 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
       el.hidden = !t;
       if (t) el.textContent = t >= 2 ? `오늘 당신을 포함해 ${t}분이 이곳에 무거운 마음을 두고 갔어요.${all > t ? ` 지금까지는 ${all}분이에요.` : ''}`
         : all > 1 ? `오늘 이곳에 마음을 두고 간 첫 번째 분이에요. 지금까지 ${all}분이 다녀갔어요.` : '이곳에 마음을 맡긴 첫 번째 분이에요.';
+    }
+    { // calendar reminder for the next post time: made by the server from a time only, nothing about the letter
+      const box = $('calBox'); box.hidden = !(mailLive && duty);
+      if (!box.hidden) {
+        const KST = 9 * 3600e3, now = Date.now(), d0 = new Date(now + KST); d0.setUTCHours(0, 0, 0, 0);
+        const day0 = d0.getTime() - KST; let at = 0, label = '';
+        outer: for (let add = 0; add < 3; add++) for (const [h, m, w] of [[7, 0, '아침 7시'], [12, 30, '낮 12시 30분'], [21, 0, '밤 9시']]) {
+          const t = day0 + add * 864e5 + (h * 60 + m) * 60e3;
+          if (t >= now + 3600e3) { at = t; label = (add === 0 ? '오늘 ' : add === 1 ? '내일 ' : '모레 ') + w; break outer; }
+        }
+        $('calBtn').href = '/api/remind.ics?at=' + at;
+        $('calNote').textContent = `${label} 우편 시간에 들르라는 일정이 이 폰 캘린더에 들어가요. 일정에는 고해 내용이 담기지 않아요.`;
+      }
     }
     $('oneLineBox').hidden = !duty; $('peekRow').hidden = !duty || mailLive;
     if (duty) {
