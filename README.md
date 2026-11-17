@@ -29,6 +29,18 @@ npm run dev      # http://127.0.0.1:8787
 npm run deploy   # Cloudflare에 배포 (wrangler 로그인 필요)
 ```
 
+## 테스트 (`tests/`)
+
+로컬 서버를 `npm run build && npx wrangler dev --port 8788`로 띄운 뒤 실행한다. 시간 규칙은 `.dev.vars`의 `DEV_LIMITS`로 줄인다. 이 값은 테스트용이며 실서비스에 두지 않는다. `wrangler dev`는 셸 환경변수보다 `.dev.vars`를 먼저 읽는다.
+
+- API 검사 (짧은 시간 규칙):
+  `DEV_LIMITS={"START_MS":4000,"REPLY_MS":8000,"MAIL_DELAY_MS":0,"DUTY_TTL_MS":5000,"WAIT_MS":30000,"TOMB_MS":600000}`
+  `ADMIN_TOKEN=... node tests/api.test.mjs`, `node tests/push.test.mjs` (push 검사는 `.dev.vars`에 `PUSH_ALLOW_HOST`가 필요)
+- 화면 흐름 검사 (읽는 시간이 있어 긴 시간 규칙, Playwright 필요):
+  `DEV_LIMITS={"START_MS":30000,"REPLY_MS":120000,"MAIL_DELAY_MS":0,"DUTY_TTL_MS":8000,"WAIT_MS":300000,"TOMB_MS":600000}`
+  `node tests/e2e.cjs`, `node tests/e2e2.cjs`
+- 매 실행 전에 `.wrangler/state`를 지우면 숫자 검사(오늘 몇 분 등)가 흔들리지 않는다.
+
 ## Cloudflare 자동 배포 (GitHub 연결)
 
 Cloudflare 대시보드 → Workers & Pages → Create → Import a repository 에서 이 저장소를 고른다.

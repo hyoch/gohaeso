@@ -29,6 +29,17 @@ const html = `<!doctype html>
 <meta property="og:title" content="${title}">
 <meta property="og:description" content="${desc}">
 <meta property="og:type" content="website">
+<meta property="og:url" content="https://${CANON}/">
+<meta property="og:site_name" content="작은 고해소">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:image" content="https://${CANON}/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="촛불 옆에 '여기서는 사람만 대답해요.'라고 적힌 작은 고해소 소개 그림">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${title}">
+<meta name="twitter:description" content="${desc}">
+<meta name="twitter:image" content="https://${CANON}/og.jpg">
 <meta name="theme-color" content="#2a2140">
 <script>if (location.hostname.endsWith('.workers.dev')) location.replace('https://${CANON}' + location.pathname + location.search + location.hash)</script>
 <link rel="manifest" href="/manifest.webmanifest">
