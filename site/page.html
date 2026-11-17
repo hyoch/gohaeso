@@ -149,7 +149,6 @@ body.typing { padding-bottom: 45vh }                   /* room to scroll the box
 .sheetActs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px }
 .sheetActs > * { width: 100%; text-align: center }
 .sheetLink { display: inline-block; text-decoration: none; border-radius: 999px; padding: 11px 20px; font-weight: 600 }
-#keepX { justify-self: center }
 .more { margin: 6px 0 } .more summary { font-size: 12.5px; color: var(--muted); cursor: pointer; padding: 6px 0 }
 .shareCount { color: var(--muted); margin: -2px 0 8px }
 .gone { text-decoration: line-through; opacity: .4; transition: opacity .35s }
@@ -599,7 +598,6 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
       <a class="ghost sheetLink" id="keepDl" href="#" download="gohaeso-letter.png" hidden>파일로 내려받기</a>
     </div>
     <p class="small" id="keepHint"></p>
-    <a class="small" id="keepX" href="#" target="_blank" rel="noopener noreferrer">X에 글로 올리기</a>
   </div>
 </div>
 <footer>
@@ -1976,7 +1974,6 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
     $('keepHint').textContent = share
       ? '공유하기에서 인스타그램·카카오톡 등을 고를 수 있어요. 인스타그램에서는 스토리나 게시물을 골라요. 사진에 저장은 공유 창의 "이미지 저장"을 눌러요.'
       : '그림을 길게 눌러 사진에 저장할 수 있어요. 컴퓨터에서는 파일로 내려받아요.';
-    $('keepX').href = 'https://x.com/intent/post?text=' + encodeURIComponent('사람이 손수 쓴 답장을 받았어요. 🕯') + '&url=' + encodeURIComponent('https://gohaeso.space/');
     sheetReturn = document.activeElement;
     $('keepSheet').hidden = false; document.documentElement.style.overflow = 'hidden';
     $(share ? 'keepShare' : 'keepClose').focus();
