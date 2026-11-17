@@ -136,6 +136,7 @@ button { font: inherit; cursor: pointer; border: 0; border-radius: 999px; paddin
 body.typing { padding-bottom: 45vh }                   /* room to scroll the box above the keyboard */
 .calBox { margin: 4px 0 10px } a.calBtn { display: inline-block; text-decoration: none; border-radius: 999px; padding: 6px 12px }
 .calBox .small { margin: 6px 0 0 }
+#footShareMsg:empty, #recruitMsg:empty { display: none }
 .more { margin: 6px 0 } .more summary { font-size: 12.5px; color: var(--muted); cursor: pointer; padding: 6px 0 }
 .shareCount { color: var(--muted); margin: -2px 0 8px }
 .gone { text-decoration: line-through; opacity: .4; transition: opacity .35s }
@@ -479,6 +480,7 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
         <span class="small" id="mailLine"></span>
       </div>
       <div class="row"><button class="primary" id="anotherReply">다른 고해에 답장하기</button></div>
+      <div class="row"><button type="button" class="ghost sm" id="recruitBtn">친구도 신부님으로 부르기</button><span class="small" id="recruitMsg" aria-live="polite"></span></div>
     </section>
   </div>
 
@@ -544,7 +546,7 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
     <div data-live hidden class="legal" style="display:grid;gap:8px">
       <p>로그인 대신 이 기기에 저장된 열쇠로 내 우편함을 열어요. 열쇠를 잃어버리면 저희도 우편함을 찾아드릴 방법이 없어요. 이 열쇠를 당신만의 비밀 수첩에 꼭 적어두세요. 다른 기기에서 쓰려면 그 열쇠를 '열쇠 넣기'로 넣어요. 열쇠를 아는 사람은 내 우편함을 열 수 있으니 남에게 보여주지 마세요.</p>
       <input id="keyField" type="text" readonly hidden aria-label="우편함 열쇠" autocomplete="off" spellcheck="false">
-      <div class="row"><button type="button" class="ghost sm" id="keyShow">열쇠 보기</button><button type="button" class="ghost sm" id="keyUse">열쇠 넣기</button><button type="button" class="ghost sm" id="keyErase">맡긴 글 지우고 열쇠 버리기</button></div>
+      <div class="row"><button type="button" class="ghost sm" id="keyShow">열쇠 보기</button><button type="button" class="ghost sm" id="keyCopy" data-live hidden>열쇠 복사</button><button type="button" class="ghost sm" id="keyUse">열쇠 넣기</button><button type="button" class="ghost sm" id="keyErase">맡긴 글 지우고 열쇠 버리기</button></div>
       <p class="small" id="keyMsg" aria-live="polite"></p>
       <div class="notifyBox" data-live hidden>
         <p class="small notifyMsg" aria-live="polite"></p>
@@ -573,7 +575,8 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
   </section>
 
   <footer>
-    <span class="footlinks"><button type="button" class="linkbtn" id="footPrivacy" aria-expanded="false" aria-controls="privacy">개인정보 처리방침 · 이용 수칙</button><button type="button" class="linkbtn" id="footHelp">마음이 힘들다면</button><a class="linkbtn" id="footDonate" href="#" target="_blank" rel="noopener noreferrer" hidden>후원하기</a><span>문의 <b>help@gohaeso.space</b></span></span>
+    <span class="footlinks"><button type="button" class="linkbtn" id="footPrivacy" aria-expanded="false" aria-controls="privacy">개인정보 처리방침 · 이용 수칙</button><button type="button" class="linkbtn" id="footHelp">마음이 힘들다면</button><button type="button" class="linkbtn" id="footShare">고해소 알리기</button><a class="linkbtn" id="footDonate" href="#" target="_blank" rel="noopener noreferrer" hidden>후원하기</a><span>문의 <b>help@gohaeso.space</b></span></span>
+    <span class="small" id="footShareMsg" aria-live="polite"></span>
     <span>로그인 없음 · 외부 글꼴과 분석 도구 없음 · 혼자 털어놓은 글은 저장되지 않아요</span>
     <span data-preview>이곳은 성사가 아닌 쉼터예요. 같은 링크로 들어온 사람은 실시간으로 마당에 보여요. 이름도 글도 오가지 않고 위치와 줄 순서만 오가요. 당직 신부님께 보내기, 우편함의 고해, 우체통 편지는 아직 미리보기예요.</span>
     <span data-live hidden>이곳은 성사가 아닌 쉼터예요. 마당에서는 이름도 글도 오가지 않고 위치와 줄 순서만 오가요. 당직 신부님께 맡긴 글은 암호화되어 보관되고, 기한이 지나면 지워져요.</span>
@@ -1366,6 +1369,27 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
     API.dropKey(); resetKeyUi(); km.textContent = '맡긴 글을 지우고 열쇠를 버렸어요. 새로고침하면 새 열쇠로 시작해요.';
     document.dispatchEvent(new CustomEvent('gohaeso:poke'));
   });
+  // Copy straight from the tap; if the browser refuses, show the key selected so it can be copied by hand.
+  $('keyCopy').addEventListener('click', async () => {
+    const API = window.GOHAESO_API; if (!API) return;
+    if (!API.hasKey()) { km.textContent = '아직 열쇠가 없어요. 고해를 맡기거나 당직을 서면 만들어져요.'; return; }
+    try { await navigator.clipboard.writeText(API.getKey()); resetKeyUi(); km.textContent = '열쇠를 복사했어요. 비밀 수첩에 붙여두고, 다른 기기나 홈 화면 앱에서는 \'열쇠 넣기\'로 넣어요.'; }
+    catch (e) { kf.value = API.getKey(); kf.hidden = false; kf.readOnly = true; kShow.textContent = '열쇠 숨기기'; kf.select(); km.textContent = '자동 복사가 막혀 있어요. 선택된 열쇠를 길게 눌러 복사해주세요.'; }
+  });
+
+  /* sharing: the site, or an invitation to answer. Only the address and a fixed sentence travel. */
+  async function shareOut(text, url, msgEl) {
+    const data = { title: '작은 고해소', text, url };
+    if (navigator.share) {
+      try { await navigator.share(data); msgEl.textContent = ''; return; }
+      catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    try { await navigator.clipboard.writeText(text + ' ' + url); msgEl.textContent = '소개 글과 주소를 복사했어요. 원하는 곳에 붙여넣어 주세요.'; }
+    catch (e) { msgEl.textContent = text + ' ' + url; }
+  }
+  const SITE = 'https://gohaeso.space/';
+  $('footShare').addEventListener('click', () => shareOut('AI가 쓴 위로에 지쳤다면. 여기서는 사람만 대답해요.', SITE, $('footShareMsg')));
+  $('recruitBtn').addEventListener('click', () => shareOut('사람만 대답하는 익명 고해소에서 답장을 써줄 신부님을 찾고 있어요. 붙여넣기도 AI도 없이, 손으로 쓰는 한 통이면 돼요.', SITE + '?go=reply', $('recruitMsg')));
 })();
 </script>
 </div>
