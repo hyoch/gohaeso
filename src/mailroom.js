@@ -16,6 +16,29 @@ const OPS = new Set(['me', 'duty', 'confess', 'claim', 'start', 'pass', 'reply',
 const PUSH_HOSTS = [/^fcm\.googleapis\.com$/, /(^|\.)push\.apple\.com$/, /(^|\.)push\.services\.mozilla\.com$/, /(^|\.)notify\.windows\.com$/];
 const b64u = buf => { let s = ''; new Uint8Array(buf).forEach(x => { s += String.fromCharCode(x); }); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
 const b64uStr = str => b64u(new TextEncoder().encode(str));
+const unb64u = str => Uint8Array.from(atob(str.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((str.length + 3) % 4)), c => c.charCodeAt(0));
+const cat = (...parts) => { const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0)); let o = 0; for (const p of parts) { out.set(p, o); o += p.length; } return out; };
+async function hkdf(salt, ikm, info, len) {
+  const k = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
+  return new Uint8Array(await crypto.subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt, info }, k, len * 8));
+}
+// Web Push message encryption (RFC 8291, aes128gcm, one record). Only the browser that subscribed can read it.
+async function webPushEncrypt(p256dh, auth, text) {
+  const ua = unb64u(p256dh), secret = unb64u(auth), te = new TextEncoder();
+  if (ua.length !== 65 || secret.length !== 16) throw new Error('bad keys');
+  const uaKey = await crypto.subtle.importKey('raw', ua, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+  const eph = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const asPub = new Uint8Array(await crypto.subtle.exportKey('raw', eph.publicKey));
+  const shared = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: uaKey }, eph.privateKey, 256));
+  const ikm = await hkdf(secret, shared, cat(te.encode('WebPush: info\0'), ua, asPub), 32);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const cek = await hkdf(salt, ikm, te.encode('Content-Encoding: aes128gcm\0'), 16);
+  const nonce = await hkdf(salt, ikm, te.encode('Content-Encoding: nonce\0'), 12);
+  const key = await crypto.subtle.importKey('raw', cek, 'AES-GCM', false, ['encrypt']);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, key, cat(te.encode(text), new Uint8Array([2]))));
+  const head = new Uint8Array(21); head.set(salt, 0); new DataView(head.buffer).setUint32(16, 4096); head[20] = 65;
+  return cat(head, asPub, ct);
+}
 
 function safeEq(a, b) {
   const x = new TextEncoder().encode(String(a)), y = new TextEncoder().encode(String(b));
@@ -52,6 +75,10 @@ export class Mailroom extends DurableObject {
     s('CREATE TABLE IF NOT EXISTS duty(who TEXT PRIMARY KEY, seen INTEGER NOT NULL)');
     s('CREATE TABLE IF NOT EXISTS usage(who TEXT NOT NULL, day TEXT NOT NULL, kind TEXT NOT NULL, n INTEGER NOT NULL, PRIMARY KEY(who, day, kind))');
     s('CREATE TABLE IF NOT EXISTS push(who TEXT PRIMARY KEY, ct BLOB NOT NULL, iv BLOB NOT NULL, created INTEGER NOT NULL)');
+    // letters: wants letter-arrived alerts. priest_until: wants to be called when a confession waits (0 = no).
+    for (const col of ['letters INTEGER NOT NULL DEFAULT 1', 'priest_until INTEGER NOT NULL DEFAULT 0', 'priest_last INTEGER NOT NULL DEFAULT 0'])
+      try { s('ALTER TABLE push ADD COLUMN ' + col); } catch {}
+    try { s('ALTER TABLE conf ADD COLUMN pinged_at INTEGER NOT NULL DEFAULT 0'); } catch {}
     s('CREATE TABLE IF NOT EXISTS vapid(id INTEGER PRIMARY KEY CHECK(id=1), pub TEXT NOT NULL, ct BLOB NOT NULL, iv BLOB NOT NULL)');
     s('CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT NOT NULL)');
     // daily totals for the operator: a date, a kind of event and a count. Nothing that points to anyone.
@@ -120,7 +147,8 @@ export class Mailroom extends DurableObject {
     this.run('DELETE FROM passed WHERE conf_id NOT IN (SELECT id FROM conf)');
     this.run('DELETE FROM duty WHERE seen<?', now - this.L.DUTY_TTL_MS);
     // a notification address is kept only while a thread is open (plus a day of grace), then forgotten
-    this.run(`DELETE FROM push WHERE created<? AND who NOT IN (SELECT owner FROM conf WHERE state IN ('waiting','assigned','reading','answered'))`, now - 864e5);
+    this.run(`DELETE FROM push WHERE created<? AND priest_until<? AND who NOT IN (SELECT owner FROM conf WHERE state IN ('waiting','assigned','reading','answered'))`, now - 864e5, now);
+    this.run('UPDATE push SET priest_until=0 WHERE priest_until>0 AND priest_until<?', now);
     this.run('DELETE FROM report WHERE created<?', now - this.L.REPORT_KEEP_MS);
     this.run('DELETE FROM block WHERE at<?', now - 60 * 864e5);
     this.run('DELETE FROM usage WHERE day<?', kstDay(now - 3 * 864e5));
@@ -133,9 +161,14 @@ export class Mailroom extends DurableObject {
     if (!any) return;
     let want = Date.now() + (busy ? 5 * 60e3 : 3600e3);
     // wake up exactly when a letter is due for someone who asked to be notified
-    const due = this.q(`SELECT MIN(r.deliver) d FROM reply r JOIN conf c ON c.id=r.conf_id JOIN push p ON p.who=c.owner
+    const due = this.q(`SELECT MIN(r.deliver) d FROM reply r JOIN conf c ON c.id=r.conf_id JOIN push p ON p.who=c.owner AND p.letters=1
                         WHERE r.notified=0 AND r.hidden=0 AND c.state='answered'`)[0];
     if (due && due.d !== null) want = Math.min(want, Math.max(due.d, Date.now() + 1000));
+    // wake when a waiting confession should call priests (only if any priest asked to be called)
+    if (this.q('SELECT 1 FROM push WHERE priest_until>? LIMIT 1', Date.now()).length) {
+      const w = this.q(`SELECT MIN(MAX(created + ?, pinged_at + ?)) t FROM conf WHERE state='waiting'`, this.L.PRIEST_WAIT_MS, this.L.PRIEST_PING_GAP_MS)[0];
+      if (w && w.t !== null) want = Math.min(want, Math.max(w.t, Date.now() + 1000));
+    }
     const cur = await this.ctx.storage.getAlarm();
     if (cur === null || cur > want) await this.ctx.storage.setAlarm(want);
   }
@@ -143,6 +176,7 @@ export class Mailroom extends DurableObject {
     const now = Date.now();
     this.sweep(now);
     try { await this.notifyDue(now); } catch {}
+    try { await this.callPriests(now); } catch {}
     await this.arm();
   }
 
@@ -176,16 +210,27 @@ export class Mailroom extends DurableObject {
     return PUSH_HOSTS.some(re => re.test(u.hostname)) ? u : null;
   }
 
-  async sendPush(url) {
+  // A subscription is sealed as JSON {e, p, a} (endpoint, browser public key, auth secret). Older rows hold only the endpoint.
+  async openSub(row, who) {
+    const raw = await this.vault.open(row.ct, row.iv, 'push:' + who);
+    let e = raw, p = null, a = null;
+    if (raw.startsWith('{')) { try { const j = JSON.parse(raw); e = j.e; p = j.p; a = j.a; } catch { return null; } }
+    const url = this.pushUrl(e);
+    return url ? { url, p, a } : null;
+  }
+
+  async sendPush(sub, kind) {
+    const url = sub.url || sub;
     const { pub, priv } = await this.vapidKeys();
     const origin = (this.q(`SELECT v FROM kv WHERE k='origin'`)[0] || {}).v || 'https://example.invalid';
     const head = b64uStr(JSON.stringify({ typ: 'JWT', alg: 'ES256' }));
     const body = b64uStr(JSON.stringify({ aud: url.origin, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: origin }));
     const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, priv, new TextEncoder().encode(head + '.' + body));
-    const r = await fetch(url.toString(), {
-      method: 'POST', signal: AbortSignal.timeout(6000),
-      headers: { TTL: '86400', Urgency: 'normal', Authorization: `vapid t=${head}.${body}.${b64u(sig)}, k=${pub}` }
-    });
+    const headers = { TTL: kind === 'duty' ? '14400' : '86400', Urgency: 'normal', Authorization: `vapid t=${head}.${body}.${b64u(sig)}, k=${pub}` };
+    let payload;
+    // The only content ever sent is which fixed line to show ("letter" or "duty"), encrypted for this browser (RFC 8291).
+    if (sub.p && sub.a && kind) { payload = await webPushEncrypt(sub.p, sub.a, JSON.stringify({ k: kind })); headers['Content-Encoding'] = 'aes128gcm'; headers['Content-Type'] = 'application/octet-stream'; }
+    const r = await fetch(url.toString(), { method: 'POST', signal: AbortSignal.timeout(6000), headers, body: payload });
     return r.status;
   }
 
@@ -194,15 +239,45 @@ export class Mailroom extends DurableObject {
                          WHERE r.notified=0 AND r.hidden=0 AND r.deliver<=? AND c.state='answered' LIMIT 20`, now);
     for (const r of rows) {
       this.run('UPDATE reply SET notified=1 WHERE conf_id=?', r.id);          // at most once per letter
-      const p = this.q('SELECT ct, iv FROM push WHERE who=?', r.who)[0];
+      const p = this.q('SELECT ct, iv FROM push WHERE who=? AND letters=1', r.who)[0];
       if (!p) continue;
       try {
-        const url = this.pushUrl(await this.vault.open(p.ct, p.iv, 'push:' + r.who));
-        if (!url) { this.run('DELETE FROM push WHERE who=?', r.who); continue; }
-        const st = await this.sendPush(url);
+        const sub = await this.openSub(p, r.who);
+        if (!sub) { this.run('DELETE FROM push WHERE who=?', r.who); continue; }
+        const st = await this.sendPush(sub, 'letter');
         if (st === 404 || st === 410) this.run('DELETE FROM push WHERE who=?', r.who);   // the browser dropped the subscription
       } catch { /* the letter is still in the mailbox; the notification is only a convenience */ }
     }
+  }
+
+  // A confession has waited and nobody took it: call a few priests who asked for it. Never between 01:00 and 08:00 (Korea),
+  // never the author, never someone the author blocked or who reached today's limit, each priest at most once per 6 hours.
+  async callPriests(now) {
+    const c = this.q(`SELECT id, owner FROM conf WHERE state='waiting' AND created<=? AND pinged_at<=? ORDER BY created LIMIT 1`,
+      now - this.L.PRIEST_WAIT_MS, now - this.L.PRIEST_PING_GAP_MS)[0];
+    if (!c) return;
+    this.run('UPDATE conf SET pinged_at=? WHERE id=?', now, c.id);            // evaluated now, whatever happens next
+    const h = new Date(now + 9 * 3600e3).getUTCHours();
+    if (this.L.QUIET_FROM < this.L.QUIET_TO && h >= this.L.QUIET_FROM && h < this.L.QUIET_TO) return;
+    const day = kstDay(now);
+    const rows = this.q(`SELECT who, ct, iv FROM push WHERE priest_until>? AND priest_last<=? AND who<>?
+                         AND who NOT IN (SELECT who FROM block WHERE other=?) AND who NOT IN (SELECT holder FROM conf WHERE holder IS NOT NULL)
+                         ORDER BY priest_last LIMIT 20`, now, now - this.L.PRIEST_GAP_MS, c.owner, c.owner);
+    let sent = 0;
+    for (const r of rows) {
+      if (sent >= this.L.PRIEST_PER_PING) break;
+      if (this.restricted(r.who, now) || this.used(r.who, 'reply', day) >= this.L.REPLIES_PER_DAY) continue;
+      if (this.q('SELECT 1 FROM passed WHERE conf_id=? AND who=?', c.id, r.who).length) continue;
+      this.run('UPDATE push SET priest_last=? WHERE who=?', now, r.who);
+      sent++;
+      try {
+        const sub = await this.openSub(r, r.who);
+        if (!sub) { this.run('DELETE FROM push WHERE who=?', r.who); continue; }
+        const st = await this.sendPush(sub, 'duty');
+        if (st === 404 || st === 410) this.run('DELETE FROM push WHERE who=?', r.who);
+      } catch { /* a missed call is fine; the confession is still in the queue */ }
+    }
+    this.tally('called', sent, now);
   }
 
   /* ---------- views ---------- */
@@ -223,6 +298,7 @@ export class Mailroom extends DurableObject {
   /* ---------- operations ---------- */
   async do_me(who, b, now) {
     const day = kstDay(now);
+    this.run('UPDATE push SET priest_until=? WHERE who=? AND priest_until>?', now + this.L.PRIEST_KEEP_MS, who, now);   // a visit keeps priest alerts on
     const row = this.q('SELECT * FROM conf WHERE owner=? ORDER BY created DESC LIMIT 1', who)[0];
     let mine = null;
     if (row) {
@@ -250,7 +326,7 @@ export class Mailroom extends DurableObject {
       queue: { waiting: this.q(`SELECT COUNT(*) c FROM conf WHERE state='waiting'`)[0].c, dayLeft: Math.max(0, this.L.DAY_CAP - this.used('*', 'conf', day)) },
       today: { repliesLeft: Math.max(0, this.L.REPLIES_PER_DAY - replied), passesLeft: Math.max(0, this.L.PASSES_PER_DAY - passed), canConfess: this.used(who, 'conf', day) < this.L.CONF_PER_DAY },
       windows: { startMs: this.L.START_MS, replyMs: this.L.REPLY_MS },
-      mine, held,
+      mine, held, alerts: this.alertsOf(who, now),
       feedback: { warm: this.q('SELECT COALESCE(SUM(warm),0) w FROM reply WHERE author=?', who)[0].w, thanks }
     });
   }
@@ -267,16 +343,33 @@ export class Mailroom extends DurableObject {
   async do_push(who, b, now) {
     const url = this.pushUrl(b.endpoint);
     if (!url) return err(400, 'bad_endpoint');
+    const p = typeof b.p256dh === 'string' && /^[A-Za-z0-9_-]{80,100}$/.test(b.p256dh) ? b.p256dh : null;
+    const a = typeof b.auth === 'string' && /^[A-Za-z0-9_-]{16,32}$/.test(b.auth) ? b.auth : null;
+    const kind = b.kind === 'duty' ? 'duty' : 'letter';
     this.rememberOrigin(b);
-    await this.vapidKeys();
-    const s = await this.vault.seal(url.toString(), 'push:' + who);
-    this.run('INSERT INTO push(who, ct, iv, created) VALUES(?,?,?,?) ON CONFLICT(who) DO UPDATE SET ct=excluded.ct, iv=excluded.iv, created=excluded.created', who, s.ct, s.iv, now);
-    return ok({ on: true });
+    const s = await this.vault.seal(JSON.stringify({ e: url.toString(), p, a }), 'push:' + who);
+    const old = this.q('SELECT letters, priest_until FROM push WHERE who=?', who)[0];
+    const letters = kind === 'letter' ? 1 : old ? old.letters : 0;
+    const until = kind === 'duty' ? now + this.L.PRIEST_KEEP_MS : old ? old.priest_until : 0;
+    this.run(`INSERT INTO push(who, ct, iv, created, letters, priest_until) VALUES(?,?,?,?,?,?)
+              ON CONFLICT(who) DO UPDATE SET ct=excluded.ct, iv=excluded.iv, created=excluded.created, letters=excluded.letters, priest_until=excluded.priest_until`,
+      who, s.ct, s.iv, now, letters, until);
+    await this.arm();
+    return ok(this.alertsOf(who, now));
   }
+
   async do_unpush(who, b, now) {
-    this.run('DELETE FROM push WHERE who=?', who);
-    return ok({ on: false });
+    if (b.kind === 'duty') this.run('UPDATE push SET priest_until=0 WHERE who=?', who);
+    else this.run('UPDATE push SET letters=0 WHERE who=?', who);
+    this.run('DELETE FROM push WHERE who=? AND letters=0 AND priest_until<=?', who, now);
+    return ok(this.alertsOf(who, now));
   }
+
+  alertsOf(who, now) {
+    const r = this.q('SELECT letters, priest_until FROM push WHERE who=?', who)[0];
+    return { letters: !!(r && r.letters), duty: !!(r && r.priest_until > now), dutyUntil: r && r.priest_until > now ? r.priest_until : null };
+  }
+
 
   async do_duty(who, b, now) {
     if (b.on === true) this.run('INSERT INTO duty(who, seen) VALUES(?,?) ON CONFLICT(who) DO UPDATE SET seen=excluded.seen', who, now);

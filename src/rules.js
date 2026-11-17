@@ -20,7 +20,14 @@ export const LIM = {
   MAX_BURST: 12,               // most characters one keystroke event may add (IME composition: double)
   MAX_EVENTS: 3000,
   MIN_MS_PER_CHAR: 30,         // a human cannot type faster than this on average
-  RESTRICT_REPORTS: 3          // distinct reporters (30 days) after which an author stops receiving confessions
+  RESTRICT_REPORTS: 3,         // distinct reporters (30 days) after which an author stops receiving confessions
+  // calling priests by notification when a confession waits and nobody is on duty
+  PRIEST_WAIT_MS: 10 * 60e3,   // a confession waits this long before anyone is called
+  PRIEST_PING_GAP_MS: 2 * 3600e3, // the same confession calls again at most this often
+  PRIEST_PER_PING: 3,          // priests called at a time
+  PRIEST_GAP_MS: 6 * 3600e3,   // one priest is called at most this often
+  PRIEST_KEEP_MS: 30 * 864e5,  // priest alerts switch themselves off after 30 days without a visit
+  QUIET_FROM: 1, QUIET_TO: 8   // no calls between 01:00 and 08:00 Korea time
 };
 
 export const TOPICS = new Set(['rel', 'fam', 'work', 'self', 'ai', 'etc']);

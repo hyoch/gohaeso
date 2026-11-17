@@ -387,6 +387,10 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
       <div class="row"><span class="eyebrow">당직 서기</span><span class="small" id="dutyState">당직 아님</span></div>
       <p class="small">당직을 서면 마당 성당 창문에 불이 하나 켜지고, 고해가 한 통씩 배정돼요. 당직이 아니어도 아래 우편함의 고해에는 언제든 답할 수 있어요.</p>
       <div class="row"><button class="primary" id="dutyBtn">당직 시작</button></div>
+      <div class="dutyAlert" id="dutyAlert" data-live hidden>
+        <p class="small" id="dutyAlertMsg" aria-live="polite"></p>
+        <button type="button" class="ghost sm" id="dutyAlertBtn" hidden>고해가 기다리면 알려주세요 🔔</button>
+      </div>
       <div class="row">
         <label class="small" for="dutyRes">당직 예약</label>
         <select id="dutyRes">
@@ -500,7 +504,7 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
       <li><b>실시간 마당</b>: 마당에 선 위치, 줄에 선 시각, 고민 색, 고양이 모양 번호, 당직 여부만 주고받아요. 연결할 때마다 새로 만든 무작위 번호로만 구분하고, 저장소에 기록하지 않아요. 연결이 끊기면 사라져요.</li>
       <li><b>이 기기 안</b>(브라우저 저장소): 작은 일을 한 날 수, 받은 촛불 수, 소리 설정, 입장 안내를 봤는지<span data-preview>, 오늘의 답장·넘기기 횟수</span>. 글 내용은 저장하지 않아요.</li>
       <li data-live hidden><b>우편함 열쇠</b>: 이 기기에 저장되는 무작위 문자열이에요. 서버는 열쇠를 저장하지 않고, 열쇠에서 만든 해시값만 써서 내 우편함을 구분해요. 이름·이메일·IP 주소와 이어지지 않아요.</li>
-      <li data-live hidden><b>알림 주소</b>(알림을 켠 경우에만): 브라우저가 만든 무작위 알림 주소를 암호화해서, 답장이 오가는 동안만 보관하고 끝나면 지워요. 알림에는 글이 없고 "편지가 도착했어요"라는 고정된 한 줄만 나가요. 알림은 Google·Apple·Mozilla 같은 브라우저의 알림 서비스를 거쳐요. 그곳에는 알림이 갔다는 사실만 남을 수 있어요.</li>
+      <li data-live hidden><b>알림 주소</b>(알림을 켠 경우에만): 브라우저가 만든 무작위 알림 주소를 암호화해서 보관해요. 편지 알림은 답장이 오가는 동안만, 당직 알림은 마지막으로 들른 날부터 30일까지만 두고 지워요. 알림에는 글이 없고 "편지가 도착했어요" 또는 "고해가 답장을 기다려요" 같은 정해진 한 줄만 나가요. 어떤 줄을 보일지는 이 브라우저만 풀 수 있게 암호화해서 보내요. 알림은 Google·Apple·Mozilla 같은 브라우저의 알림 서비스를 거쳐요. 그곳에는 알림이 갔다는 사실만 남을 수 있어요.</li>
       <li data-live hidden><b>맡긴 글</b>: 당직 신부님께 보낸 고해, 신부님의 답장과 쓰는 과정 기록, 답례를 암호화해서 보관해요. 하루 사용 횟수(해시 기준)는 3일, 신고 기록은 30일, 차단 기록은 60일 뒤 지워요.</li>
       <li><b>접속 정보</b>: 통신하려면 IP 주소가 Cloudflare 네트워크를 지나가요. 이 서비스는 요청 기록을 남기지 않게 설정했고, IP 주소를 저장하거나 분석하지 않아요. 다만 Cloudflare가 자체 보안·운영 목적으로 처리할 수 있어요.</li>
     </ul>
@@ -1800,7 +1804,41 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
       const btn = b.querySelector('.notifyBtn'); btn.hidden = !label; btn.textContent = label; btn.disabled = false; btn.dataset.st = st;
     });
   }
-  async function refreshNotify() { if (G.mailLive && API && API.push) paintNotify(await API.push.state()); }
+  async function refreshNotify() { if (G.mailLive && API && API.push) paintNotify(await API.push.state('letter', G.me && G.me.alerts)); }
+  /* priest alerts: called when a confession waits and nobody is on duty */
+  const DUTY_ALERT = {
+    on: ['당직 알림을 켰어요. 고해가 기다리는데 당직 신부님이 없으면 알려드려요. 한 번 알린 뒤 6시간은 쉬고, 새벽 1시~8시에는 보내지 않아요. 30일 동안 들르지 않으면 저절로 꺼져요.', '당직 알림 끄기'],
+    off: ['당직을 서지 않을 때도, 고해가 답장을 기다리면 알려드릴까요? 알림에는 고해 내용이 담기지 않아요.', '고해가 기다리면 알려주세요 🔔'],
+    denied: [NOTIFY.denied[0], ''],
+    install: ["iPhone은 '홈 화면에 추가'로 연 뒤에 당직 알림을 켤 수 있어요.", ''],
+    unsupported: ['이 브라우저는 알림을 지원하지 않아요.', ''],
+    error: [NOTIFY.error[0], '고해가 기다리면 알려주세요 🔔']
+  };
+  let dutyAlertBusy = false;
+  function paintDutyAlert(st) {
+    const [msg, label] = DUTY_ALERT[st] || DUTY_ALERT.off, btn = $('dutyAlertBtn');
+    $('dutyAlertMsg').textContent = msg; btn.hidden = !label; btn.textContent = label; btn.disabled = false; btn.dataset.st = st;
+  }
+  async function refreshDutyAlert() { if (G.mailLive && API && API.push) paintDutyAlert(await API.push.state('duty', G.me && G.me.alerts)); }
+  $('dutyAlertBtn').addEventListener('click', async () => {
+    if (dutyAlertBusy || !API || !API.push) return;
+    dutyAlertBusy = true; $('dutyAlertBtn').disabled = true;
+    const btn = $('dutyAlertBtn');
+    try {
+      const st = btn.dataset.st === 'on' ? await API.push.disable('duty') : await API.push.enable('duty');
+      if (G.me && G.me.alerts) G.me.alerts.duty = st === 'on';
+      paintDutyAlert(st); refreshNotify();
+    } finally { dutyAlertBusy = false; }
+  });
+  document.addEventListener('gohaeso:live', refreshDutyAlert);
+  document.addEventListener('gohaeso:me', () => { refreshDutyAlert(); refreshNotify(); });
+  /* opened from a notification: go to the right place */
+  const openFromAlert = where => { if (where === 'reply') $('tabReply').click(); else if (where === 'mail') $('tabConfess').click(); };
+  document.addEventListener('gohaeso:live', () => {
+    const q = new URLSearchParams(location.search);
+    if (q.get('go') === 'reply') { openFromAlert('reply'); try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) {} }
+  });
+  if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => { if (e.data && typeof e.data.go === 'string') openFromAlert(e.data.go); });
   document.querySelectorAll('.notifyBtn').forEach(btn => btn.addEventListener('click', async () => {
     if (notifyBusy || !API || !API.push) return;
     notifyBusy = true; document.querySelectorAll('.notifyBtn').forEach(b => { b.disabled = true; });
