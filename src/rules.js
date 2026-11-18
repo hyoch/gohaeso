@@ -83,16 +83,30 @@ export function checkTrace(text, log) {
   return traceStats(log, text.length);
 }
 
+// iPhone's Korean keyboard builds a syllable by deleting the previous one and inserting the next (ㅇ → 우 → 울),
+// without composition events. A one-character Hangul deletion followed at once by a one-character Hangul insertion
+// at the same place is that, not a person rewriting.
+const HANGUL = /[\u1100-\u11FF\u3130-\u318F\uAC00-\uD7A3]/;
+export const IME_GAP_MS = 80;
+export function isImeSwap(prevText, e, next) {
+  if (!next || e[4] || e[2] !== 1 || e[3]) return false;
+  const removed = prevText.slice(e[1], e[1] + 1);
+  return HANGUL.test(removed) && next[1] === e[1] && next[2] === 0 && typeof next[3] === 'string' && next[3].length === 1 &&
+    HANGUL.test(next[3]) && next[0] - e[0] <= IME_GAP_MS;
+}
+
 export function traceStats(log, len) {
-  let active = 0, pauses = 0, fixes = 0, delChars = 0, run = false;
+  let active = 0, pauses = 0, fixes = 0, delChars = 0, run = false, cur = '';
   const gaps = [];
   for (let i = 0; i < log.length; i++) {
-    const [t, , del, ins, c] = log[i];
+    const [t, at, del, ins, c] = log[i];
     const g = i ? t - log[i - 1][0] : 0;
     active += Math.min(g, 30000);
     if (g > 2000) pauses++;
     if (g > 0 && g < 2000) gaps.push(g);
-    if (!c && del > 0 && !ins) { delChars += del; if (!run) fixes++; run = true; } else if (ins) run = false;
+    const ime = isImeSwap(cur, log[i], log[i + 1]);
+    if (!c && del > 0 && !ins && !ime) { delChars += del; if (!run) fixes++; run = true; } else if (ins && !ime) run = false;
+    cur = cur.slice(0, at) + (ins || '') + cur.slice(at + del);
   }
   const mean = gaps.reduce((a, b) => a + b, 0) / (gaps.length || 1);
   const sd = Math.sqrt(gaps.reduce((a, b) => a + (b - mean) ** 2, 0) / (gaps.length || 1));

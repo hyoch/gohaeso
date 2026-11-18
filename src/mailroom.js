@@ -385,7 +385,9 @@ export class Mailroom extends DurableObject {
     if (CONTACT_STRICT.test(text)) return err(422, 'contact');
     const day = kstDay(now);
     const gate = () => {
-      const cur = this.q(`SELECT state FROM conf WHERE owner=? AND state IN ('waiting','assigned','reading','answered') LIMIT 1`, who)[0];
+      // one open confession at a time; once its reply has been read, the next one may be handed in (still one a day)
+      const cur = this.q(`SELECT c.state FROM conf c LEFT JOIN reply r ON r.conf_id=c.id WHERE c.owner=?
+                          AND (c.state IN ('waiting','assigned','reading') OR (c.state='answered' AND r.read_at IS NULL AND COALESCE(r.hidden,0)=0)) LIMIT 1`, who)[0];
       if (cur) return err(409, 'active');
       if (this.used(who, 'conf', day) >= this.L.CONF_PER_DAY) return err(429, 'today_done');
       if (this.used('*', 'conf', day) >= this.L.DAY_CAP) return err(429, 'day_full');

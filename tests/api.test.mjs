@@ -82,6 +82,8 @@ ok('letter carries a replayable trace', Array.isArray(L.d.letter.log) && L.d.let
 ok('letter stats include blurs', L.d.letter.stats.blurs === 2 && L.d.letter.stats.pauses >= 1, L.d.letter.stats);
 ok('letter shows the confessor their own confession', L.d.letter.mine && L.d.letter.mine.text === SECRET && L.d.letter.mine.topic === 'ai', L.d.letter.mine);
 ok('stranger has no letter', (await call('GET', 'letter', C)).d.letter === null);
+{ const again = await call('POST', 'confess', A, { topic: 'etc', text: '답장을 읽고 나서 다시 맡겨보는 고해' });
+  ok('a read letter no longer blocks; only the daily limit applies', again.d?.error === 'today_done', again.d); }
 ok('warm', (await call('POST', 'warm', A, {})).d.warm === true);
 ok('thanks with link refused', (await call('POST', 'thanks', A, { text: 'https://x.com 고마워요' })).d?.error === 'contact');
 ok('thanks ok', (await call('POST', 'thanks', A, { text: '덕분에 오늘은 덜 무거웠어요.' })).d.thanked === true);
