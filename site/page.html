@@ -349,6 +349,7 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
     <p class="warn" id="sendErr" role="status" hidden></p>
     <div class="row">
       <span class="small" id="count">0 / 2000</span>
+      <button type="button" class="ghost" id="backYard" hidden>마당으로 나가기</button>
       <button class="primary" id="send" disabled>털어놓기</button>
     </div>
   </section>
@@ -1591,23 +1592,29 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
     renderDutyInfo();
   }));
   function renderDuty() { $('dutyChip').textContent = `당직 신부님 ${dutyCount()}명`; if (onDutyChange) onDutyChange(); renderDutyInfo(); }
+  // a mailbox with a confession still open (waiting, being answered, or a letter not yet gone) cannot hand in another
+  const hasOpen = () => !!(G.mailLive && G.me && G.me.mine && ['waiting', 'assigned', 'reading', 'answered'].includes(G.me.mine.state));
+  const dutyBlocked = () => sendMode === 'duty' && hasOpen();
   function renderDutyInfo() {
     const duty = sendMode === 'duty', n = dutyCount(), el = $('dutyInfo');
     el.hidden = !duty;
     send.textContent = !duty ? '털어놓기' : n ? '당직 신부님께 보내기' : '편지로 맡겨두기';
+    send.disabled = ta.value.trim().length === 0 || dutyBlocked();
     if (!duty) return;
+    if (hasOpen()) { el.textContent = '이미 맡겨둔 고해가 있어요. 답장이 오면 우체통에서 열 수 있고, 그 편지가 지워진 뒤에 새로 맡길 수 있어요. 지금은 혼자 털어놓기만 할 수 있어요.'; return; }
     const next = G.reserve || (live ? '' : '22:00');
     el.textContent = n
-      ? `지금 당직 신부님 ${n}명. 오래 기다린 고해부터 한 분께 배정돼요. 답장은 느린 우편으로 내일 아침 우체통에 도착해요. 하루 선착순 60통까지 받아요.`
+      ? `지금 당직 신부님 ${n}명. 오래 기다린 고해부터 한 분께 배정돼요. 답장은 다음 우편 시간(아침 7시·낮 12시 30분·밤 9시)에 우체통에 도착해요. 하루 선착순 60통까지 받아요.`
       : '지금은 당직 신부님이 없어요. 편지로 맡겨두면 48시간 동안 우편함에서 기다리고, 당직이 아닌 신부님도 답할 수 있어요.' +
         (next ? ` 다음 당직 예고 · ${next}${G.reserve || live ? '' : ' (예시)'}` : '');
   }
   document.addEventListener('gohaeso:duty', renderDuty);
+  document.addEventListener('gohaeso:me', renderDutyInfo);
   renderDuty();
 
   ta.addEventListener('input', () => {
     $('count').textContent = `${ta.value.length} / 2000`;
-    send.disabled = ta.value.trim().length === 0;
+    send.disabled = ta.value.trim().length === 0 || dutyBlocked();
   });
 
   let reqBefore = 0;
@@ -2489,7 +2496,8 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
     $('fade').classList.remove('on');
     $('write').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest' });
   }
-  $('leave').addEventListener('click', async () => {
+  // leaving the booth: after confessing (a lit candle and a send-off) or simply walking back out
+  async function exitBooth(confessed) {
     $('fade').classList.add('on');
     await wait(600);
     mode = 'yard'; inside = false; setView('yard');
@@ -2501,13 +2509,16 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
     Object.assign(me.userData, { droop: false, entering: false, noJoinUntil: performance.now() + 8000 });
     me.position.copy(IN); me.visible = true; me.rotation.y = 0; doorTarget = 1; doorBusy = true;
     $('fade').classList.remove('on');
-    $('status').textContent = '가벼워진 발걸음으로 나왔어요.';
+    $('status').textContent = confessed ? '가벼워진 발걸음으로 나왔어요.' : '마당으로 나왔어요. 다시 들어가고 싶으면 문 앞으로 걸어가요.';
     goTo(me, V(0, 0, -2.4), () => {
-      me.userData.hopT = 1.2; lightCandle(myTopic.color); doorTarget = 0; doorBusy = false;
-      sendOff(me);
-      setTimeout(() => goTo(me, V(2.4, 0, 1.8)), reduce ? 100 : 1500);
+      doorTarget = 0; doorBusy = false;
+      if (confessed) { me.userData.hopT = 1.2; lightCandle(myTopic.color); sendOff(me); }
+      setTimeout(() => goTo(me, V(2.4, 0, 1.8)), reduce ? 100 : confessed ? 1500 : 400);
     });
-  });
+  }
+  $('leave').addEventListener('click', () => exitBooth(true));
+  $('backYard').hidden = false;
+  $('backYard').addEventListener('click', () => exitBooth(false));
   $('join').addEventListener('click', join);
 
   /* ---------- input ---------- */
