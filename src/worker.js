@@ -113,7 +113,7 @@ const reply = (status, data) => new Response(JSON.stringify(data), { status, hea
 const plain = data => new Response(JSON.stringify(data), { headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
 
 // A calendar reminder to visit the post box. It holds a time and the site address only: no key, no letter, nothing stored.
-const POST_SLOTS = [[7, 0], [12, 30], [21, 0]];
+const POST_SLOTS = [[1, 0], [8, 0], [12, 30], [18, 0], [20, 30], [22, 0], [23, 30]];   // same as POST_TIMES in rules.js
 function remindIcs(request, url) {
   if (request.method !== 'GET' && request.method !== 'HEAD') return reply(405, { error: 'not_found' });
   const at = Number(url.searchParams.get('at')), now = Date.now();
@@ -134,7 +134,7 @@ function remindIcs(request, url) {
     'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//gohaeso//remind//KO', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
     'BEGIN:VEVENT', `UID:${crypto.randomUUID()}@${url.host}`, `DTSTAMP:${stamp(now)}`, `DTSTART:${stamp(at)}`, `DTEND:${stamp(at + 15 * 60e3)}`,
     `SUMMARY:${esc('작은 고해소 우체통 들르기')}`,
-    `DESCRIPTION:${esc('답장이 도착했을 수 있어요. 고해를 맡긴 그 브라우저로 열어주세요.\n아직 오지 않았다면 다음 우편 시간(아침 7시·낮 12시 30분·밤 9시)에 다시 들러주세요.\n' + site)}`,
+    `DESCRIPTION:${esc('답장이 도착했을 수 있어요. 고해를 맡긴 그 브라우저로 열어주세요.\n아직 오지 않았다면 다음 우편 시간(아침 8시·낮 12시 30분, 저녁 6시부터 새벽 1시까지는 1~2시간마다)에 다시 들러주세요.\n' + site)}`,
     `URL:${site}`,
     'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${esc('우체통에 들를 시간이에요')}`, 'TRIGGER:PT0M', 'END:VALARM',
     'END:VEVENT', 'END:VCALENDAR'

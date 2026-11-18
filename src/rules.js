@@ -46,9 +46,10 @@ const KST = 9 * 3600e3;
 export const kstDay = ms => new Date(ms + KST).toISOString().slice(0, 10);
 
 // Slow mail: letters go out at fixed "post times" (Korea time), never instantly.
-// The next post time that is at least 1 hour away.
-export const POST_TIMES = [[7, 0], [12, 30], [21, 0]];
-export const MIN_WAIT_MS = 3600e3;
+// The next post time that is at least 30 minutes away.
+// Few in the morning, many in the evening and late night, when most people write. Ascending within a day.
+export const POST_TIMES = [[1, 0], [8, 0], [12, 30], [18, 0], [20, 30], [22, 0], [23, 30]];
+export const MIN_WAIT_MS = 30 * 60e3;   // a letter waits at least 30 minutes for its post time
 export function nextDeliver(ms) {
   const d = new Date(ms + KST);
   d.setUTCHours(0, 0, 0, 0);
