@@ -197,6 +197,11 @@ body.typing { padding-bottom: 45vh }                   /* room to scroll the box
 .chip.on { color: var(--ink); border-color: var(--flame); background: color-mix(in srgb, var(--flame) 18%, transparent) }
 @media (prefers-reduced-motion: reduce) { .thinking.pausing { animation: none } }
 
+.starters { display: grid; gap: 6px }
+.starters[hidden] { display: none }
+.starters button { font: inherit; font-size: 13.5px; padding: 6px 12px; border-radius: 999px; border: 1px dashed var(--line, #5c5470); background: none; color: inherit; cursor: pointer; text-align: left }
+.emptyHelp { display: grid; gap: 8px; margin-top: 10px }
+.emptyHelp[hidden] { display: none }
 .dutyInfo { margin: 0; background: var(--glow); border-radius: 10px; padding: 10px 12px; font-size: 13.5px }
 .oneLine { background: var(--bg); border-radius: 12px; padding: 12px 14px; display: grid; gap: 6px }
 .oneLine p { margin: 0; font-family: var(--serif); font-size: 17px; line-height: 1.7 }
@@ -388,6 +393,10 @@ a.inappBtn { display: inline-block; text-decoration: none; border-radius: 999px;
   <section class="panel" id="write" hidden>
     <label class="hint" for="confession">여기엔 신부님과 당신뿐이에요. 천천히 적어보세요.</label>
     <p class="small" id="carry"></p>
+    <div class="starters" id="starters" role="group" aria-label="시작 문장">
+      <span class="small">막막하면 한 줄만 골라 시작해보세요</span>
+      <div class="chips"></div>
+    </div>
     <div class="chips" id="sendMode" role="group" aria-label="털어놓는 방식">
       <button type="button" class="chip-t" data-m="duty" aria-pressed="false" style="--c:#ffb24a"><span class="dot"></span>신부님께 맡기기 · 사람의 답장이 와요</button>
       <button type="button" class="chip-t" data-m="alone" aria-pressed="true" style="--c:#8fe0aa"><span class="dot"></span>혼자 털어놓기 · 아무도 안 봐요</button>
@@ -485,6 +494,15 @@ a.inappBtn { display: inline-block; text-decoration: none; border-radius: 999px;
       <span class="ttag" id="confTopic"></span>
       <p class="confText" id="confText"></p>
       <span class="small" id="confMeta"></span>
+      <div class="emptyHelp" id="emptyHelp" hidden>
+        <p class="small">고해가 올 때까지 화면을 지키고 있지 않아도 돼요.</p>
+        <p class="small" id="emptyBellMsg" aria-live="polite"></p>
+        <div class="row">
+          <button type="button" class="ghost sm" id="emptyBell" hidden>고해가 생기면 알려주세요 🔔</button>
+          <button type="button" class="ghost sm" id="emptyInvite">친구도 신부님으로 부르기</button>
+        </div>
+        <span class="small" id="emptyInviteMsg" aria-live="polite"></span>
+      </div>
       <div class="row" id="safeConf"><button type="button" class="ghost sm" id="reportConf">어긋난 마음 알리기</button><span class="small">연락처를 묻거나 해치는 내용이면 알려주세요.</span></div>
     </section>
 
@@ -1129,8 +1147,10 @@ a.inappBtn { display: inline-block; text-decoration: none; border-radius: 999px;
       clearInterval(assignTimer); assignTimer = 0;
       $('confText').textContent = EMPTY[reason] || EMPTY.empty; $('confMeta').textContent = '';
       $('compose').hidden = true; $('listen').hidden = true; $('limit').hidden = reason !== 'limit';
+      $('emptyHelp').hidden = !(reason === 'empty' && G.mailLive); setTimeout(() => { try { refreshDutyAlert(); } catch (e) {} }, 0);
       return;
     }
+    $('emptyHelp').hidden = true;
     const tp = T[cur.topic] || T.etc;
     const d = document.createElement('span'); d.className = 'dot'; d.style.setProperty('--c', tp.color); tag.append(d, tp.name);
     $('confText').textContent = cur.text;
@@ -1478,6 +1498,7 @@ a.inappBtn { display: inline-block; text-decoration: none; border-radius: 999px;
     catch (e) { msgEl.textContent = text + ' ' + url; }
   }
   const SITE = 'https://gohaeso.space/';
+  $('emptyInvite').addEventListener('click', () => shareOut('사람만 대답하는 익명 고해소에서 답장을 써줄 신부님을 찾고 있어요. 붙여넣기도 AI도 없이, 손으로 쓰는 한 통이면 돼요.', SITE + '?go=reply', $('emptyInviteMsg')));
   $('footShare').addEventListener('click', () => shareOut('AI가 쓴 위로에 지쳤다면. 여기서는 사람만 대답해요.', SITE, $('footShareMsg')));
   $('recruitBtn').addEventListener('click', () => shareOut('사람만 대답하는 익명 고해소에서 답장을 써줄 신부님을 찾고 있어요. 붙여넣기도 AI도 없이, 손으로 쓰는 한 통이면 돼요.', SITE + '?go=reply', $('recruitMsg')));
 })();
@@ -1587,6 +1608,20 @@ a.inappBtn { display: inline-block; text-decoration: none; border-radius: 999px;
   const wait = ms => new Promise(r => setTimeout(r, reduce ? Math.min(ms, 300) : ms));
   const ta = $('confession'), send = $('send');
   const SFX = window.GOHAESO_SFX;
+  /* starter lines: human-written openers that only fill an empty box; hidden once anything is typed */
+  const STARTERS = ['오늘 가장 무거웠던 건… ', '말하지 못하고 삼킨 말이 있어요. ', '괜히 미안했던 일이 있어요. ', '요즘 자꾸 AI에게만 털어놓게 돼요. '];
+  const startBox = $('starters');
+  const syncStarters = () => { startBox.hidden = ta.value.length > 0; };
+  STARTERS.forEach(t => {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = t.trim();
+    b.addEventListener('click', () => {
+      if (ta.value) return;
+      ta.value = t; ta.focus(); try { ta.setSelectionRange(t.length, t.length); } catch (e) {}
+      ta.dispatchEvent(new Event('input', { bubbles: true })); syncStarters();
+    });
+    startBox.querySelector('.chips').appendChild(b);
+  });
+  ta.addEventListener('input', syncStarters);
 
   /* ================= ritual (no network, no storage of text) ================= */
   const REPLIES = [
@@ -1713,7 +1748,7 @@ a.inappBtn { display: inline-block; text-decoration: none; border-radius: 999px;
   function burn() {
     reqBefore = performance.getEntriesByType('resource').length;
     const words = ta.value.split(/(\s+)/);
-    ta.value = ''; $('count').textContent = '0 / 2000'; send.disabled = true;
+    ta.value = ''; $('count').textContent = '0 / 2000'; send.disabled = true; syncStarters();
     const smoke = $('smoke'); smoke.textContent = '';
     words.forEach((w, i) => {
       const s = document.createElement('span');
@@ -1975,9 +2010,12 @@ a.inappBtn { display: inline-block; text-decoration: none; border-radius: 999px;
   let dutyAlertBusy = false;
   function paintDutyAlert(st) {
     const [msg, label] = DUTY_ALERT[st] || DUTY_ALERT.off, btn = $('dutyAlertBtn');
+    $('emptyBell').hidden = !label; $('emptyBell').dataset.st = st;
+    $('emptyBellMsg').textContent = st === 'on' ? '당직 알림을 켜두었어요. 고해가 기다리면 알려드려요.' : st === 'denied' ? msg : '';
     $('dutyAlertMsg').textContent = msg; btn.hidden = !label; btn.textContent = label; btn.disabled = false; btn.dataset.st = st;
   }
   async function refreshDutyAlert() { if (G.mailLive && API && API.push) paintDutyAlert(await API.push.state('duty', G.me && G.me.alerts)); }
+  $('emptyBell').addEventListener('click', () => $('dutyAlertBtn').click());
   $('dutyAlertBtn').addEventListener('click', async () => {
     if (dutyAlertBusy || !API || !API.push) return;
     dutyAlertBusy = true; $('dutyAlertBtn').disabled = true;
