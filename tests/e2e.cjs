@@ -56,6 +56,8 @@ const { chromium } = require('playwright');
   ok('A: open-mail button present', await vis(A, 'openMail'));
   await A.p.click('#openMail'); await A.p.waitForSelector('#letter:not([hidden])', { timeout: 10000 });
   ok('A: letter text equals the reply', (await txt(A, 'letterText')) === REPLY, await txt(A, 'letterText'));
+  ok('A: own confession is shown above the letter', (await vis(A, 'myConfBox')) && (await txt(A, 'myConfText')) === SECRET && /내가 맡긴 고해/.test(await txt(A, 'myConfMeta')), await txt(A, 'myConfMeta'));
+  await A.p.locator('#letter').screenshot({ path: require('path').join(require('os').tmpdir(), 'letter_myconf.png') });
   ok('A: proof line shows 1 fix + pauses', /1번 고쳐 쓰고/.test(await txt(A, 'letterProof')), await txt(A, 'letterProof'));
   await A.p.click('#letterReplay'); await A.p.waitForTimeout(600);
   const mid = await txt(A, 'letterText'); ok('A: replay is running (text is being rebuilt)', mid.length < REPLY.length + 3 && mid.length > 0, mid);

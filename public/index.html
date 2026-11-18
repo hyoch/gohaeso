@@ -185,6 +185,9 @@ body.typing { padding-bottom: 45vh }                   /* room to scroll the box
 .sheetActs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px }
 .sheetActs > * { width: 100%; text-align: center }
 .sheetLink { display: inline-block; text-decoration: none; border-radius: 999px; padding: 11px 20px; font-weight: 600 }
+.myConf { border-left: 3px solid var(--topic, var(--muted)); padding: 4px 0 4px 12px; margin: 4px 0 2px }
+.myConf summary { font-size: 13px; color: var(--muted); cursor: pointer; list-style-position: inside }
+.myConfText { margin: 8px 0 0; color: var(--muted); white-space: pre-wrap; word-break: break-word; line-height: 1.7; max-height: 14em; overflow-y: auto }
 .more { margin: 6px 0 } .more summary { font-size: 12.5px; color: var(--muted); cursor: pointer; padding: 6px 0 }
 .shareCount { color: var(--muted); margin: -2px 0 8px }
 .gone { text-decoration: line-through; opacity: .4; transition: opacity .35s }
@@ -338,6 +341,10 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
   <p class="small" id="hint">바닥을 누르면 그쪽으로 걸어가요. 성당 문 앞에 다가가면 줄에 서요.</p>
   <section class="panel" id="letter" hidden>
     <div class="row"><span class="eyebrow" id="letterEyebrow">우체통에 도착한 답장 · 예시</span><button class="ghost sm" id="letterClose">편지 접기</button></div>
+    <details class="myConf" id="myConfBox" open hidden>
+      <summary><span id="myConfMeta">내가 맡긴 고해</span></summary>
+      <p class="myConfText" id="myConfText"></p>
+    </details>
     <div class="letterOut">
       <p class="badge">사람이 손수 쓴 답장</p>
       <p class="replyText" id="letterText"></p>
@@ -1787,6 +1794,7 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
     if (G.mailLive) { if (mailReady()) openLetterLive(); return; }
     if (!mailReady()) return;
     $('letterText').textContent = LETTERS[mail.li];
+    paintMyConf({ topic: 'work', at: Date.now(), text: '예시예요. 실제로는 여기에 내가 맡긴 고해가 보여요.\n요즘 회사에서 실수가 잦아서 나만 뒤처지는 것 같아요. 아무한테도 말을 못 하겠어요.' });
     $('letterProof').textContent = '9분 동안 · 6번 고쳐 쓰고 · 4번 멈춰 생각하며 쓴 답장이에요';
     $('letterWarm').disabled = false; $('letterWarm').textContent = '따뜻했어요 🕯';
     $('thanksBox').value = ''; $('thanksSend').disabled = true;
@@ -1941,12 +1949,21 @@ footer { font-size: 14px; line-height: 1.7; color: var(--muted); display: grid; 
     try { localStorage.setItem(DK, mail.dismissKey); } catch (e) {}
     mail = null; renderMail();
   });
+  function paintMyConf(m) {
+    const box = $('myConfBox');
+    if (!m || !m.text) { box.hidden = true; return; }
+    const t = (window.GOHAESO_TOPICS || []).find(x => x.key === m.topic), when = m.at ? new Date(m.at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }) + ' · ' : '';
+    $('myConfMeta').textContent = '내가 맡긴 고해 · ' + when + (t ? t.name : '');
+    box.style.setProperty('--topic', t ? t.color : '');
+    $('myConfText').textContent = m.text; box.open = true; box.hidden = false;
+  }
   async function openLetterLive() {
     const r = await API.call('GET', 'letter');
     if (!r.ok || !r.data.letter) { document.dispatchEvent(new CustomEvent('gohaeso:poke')); return; }
     const L = r.data.letter, st = L.stats;
     letterFinal = L.text; letterLog = L.log.map(a => ({ t: a[0], at: a[1], del: a[2], ins: a[3], c: a[4] })); letterTok++;
     $('letterText').textContent = L.text; $('letterThinking').textContent = '';
+    paintMyConf(L.mine);
     document.querySelector('#letter .badge').textContent = st.thin ? '쓰는 흔적이 적은 답장' : '사람이 손수 쓴 답장';
     $('letterProof').textContent = `${mmss(st.active)} 동안 · ${st.fixes}번 고쳐 쓰고 · ${st.pauses}번 멈춰 생각하며 쓴 답장이에요` + (st.blurs ? ` (쓰는 동안 10초 넘게 다른 화면에 ${st.blurs}번 다녀옴)` : '');
     $('letterWarm').disabled = L.warm; $('letterWarm').textContent = L.warm ? '촛불을 켰어요' : '따뜻했어요 🕯';

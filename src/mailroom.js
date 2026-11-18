@@ -466,7 +466,7 @@ export class Mailroom extends DurableObject {
 
   // The confessor opens the letter that has arrived. Opening it starts the 7-day countdown to deletion.
   async do_letter(who, b, now) {
-    const c = this.q(`SELECT id FROM conf WHERE owner=? AND state='answered' ORDER BY created DESC LIMIT 1`, who)[0];
+    const c = this.q(`SELECT id, topic, ct, iv, created FROM conf WHERE owner=? AND state='answered' ORDER BY created DESC LIMIT 1`, who)[0];
     if (!c) return ok({ letter: null });
     const r = this.q('SELECT * FROM reply WHERE conf_id=?', c.id)[0];
     if (!r || r.hidden || r.deliver > now) return ok({ letter: null });
@@ -475,7 +475,9 @@ export class Mailroom extends DurableObject {
     return ok({
       letter: {
         text, log: JSON.parse(log), stats: JSON.parse(r.stats), warm: !!r.warm,
-        thanked: this.q('SELECT 1 FROM thanks WHERE conf_id=?', c.id).length > 0, deleteAt: r.read_at + this.L.READ_KEEP_MS
+        thanked: this.q('SELECT 1 FROM thanks WHERE conf_id=?', c.id).length > 0, deleteAt: r.read_at + this.L.READ_KEEP_MS,
+        // the confession this letter answers, shown back only to the mailbox that wrote it
+        mine: c.ct && c.ct.byteLength ? { topic: c.topic, text: await this.vault.open(c.ct, c.iv, 'conf:' + c.id), at: c.created } : null
       }
     });
   }
